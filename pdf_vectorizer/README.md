@@ -155,10 +155,13 @@ for page in pages:
 
 1. `vectorize_pdf(pdf_path, owner, is_public=0, verbose=True)` - 向量化PDF文档
    - `is_public`: 0=私有（默认），1=公开
-2. `search(query, limit=5, mode="dual", verbose=True)` - 语义搜索
+2. `search(query, limit=5, mode="dual", owner=None, verbose=True)` - 语义搜索
+   - `owner`: 指定owner时，返回owner的文档+公开文档
 3. `get_pages(filename, page_numbers, fields=None, owner=None, verbose=False)` - 获取指定页面
-4. `delete_document(filename, owner, verbose=True)` - 删除文档
-5. `update_document_visibility(filename, owner, is_public, verbose=True)` - 修改文档可见性
+4. `get_document_list(owner, verbose=True)` - 获取文档列表
+   - 返回owner的文档+公开文档（去重）
+5. `delete_document(filename, owner, verbose=True)` - 删除文档
+6. `update_document_visibility(filename, owner, is_public, verbose=True)` - 修改文档可见性
    - `is_public`: 1=公开，0=私有
 
 详见完整文档或代码注释。
@@ -199,6 +202,51 @@ print(f"已更新 {result['updated_count']} 页为私有")
 - 个人笔记、私密文档 → `is_public=0`
 - 公司知识库、共享文档 → `is_public=1`
 - 动态权限管理 → 使用 `update_document_visibility` 修改
+
+### 6. 权限过滤搜索
+
+搜索时支持 owner 过滤，返回用户有权访问的文档。
+
+```python
+# 不指定owner，搜索所有文档
+results = vectorizer.search("关键词", limit=5)
+
+# 指定owner，返回：owner的文档 + 公开文档
+results = vectorizer.search("关键词", limit=5, owner="user123")
+```
+
+**权限逻辑**：
+- 未指定 `owner`: 返回所有文档
+- 指定 `owner`: 返回 `owner=user123` OR `is_public=1` 的文档
+
+### 7. 获取文档列表
+
+获取用户有权访问的所有文档列表。
+
+```python
+# 获取user123的文档列表（包括公开文档）
+document_list = vectorizer.get_document_list(owner="user123")
+
+for doc in document_list:
+    print(f"文件名: {doc['filename']}")
+    print(f"所有者: {doc['owner']}")
+    print(f"可见性: {'公开' if doc['is_public'] == 1 else '私有'}")
+    print(f"页数: {doc['page_count']}")
+    print(f"Point ID: {doc['point_id']}")
+```
+
+**返回内容**：
+- `filename`: 文件名
+- `owner`: 文档所有者
+- `is_public`: 可见性（0=私有，1=公开）
+- `point_id`: 第一个页面的 point ID
+- `page_count`: 文档总页数
+
+**特点**：
+- 自动去重（按filename）
+- 不包含内容和摘要，只有元数据
+- 返回 owner 的文档 + 所有公开文档
+- 按文件名排序
 
 ## 许可证
 

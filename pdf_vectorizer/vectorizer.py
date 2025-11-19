@@ -488,15 +488,18 @@ class PDFVectorizer:
         query: str,
         limit: int = 5,
         mode: str = "dual",
+        owner: Optional[str] = None,
         verbose: bool = True
     ) -> Dict[str, List[Dict]]:
         """
         Search similar pages by query.
+        Returns documents owned by the specified owner OR public documents (is_public=1).
 
         Args:
             query: Search query
             limit: Number of results to return per path
             mode: Retrieval mode - "dual" (both), "summary" (summary only), "content" (content only)
+            owner: Optional owner filter. Returns owner's documents + public documents
             verbose: Whether to print results
 
         Returns:
@@ -511,10 +514,28 @@ class PDFVectorizer:
         # Get query embedding
         query_embedding = self._get_embedding(query)
 
+        # Build filter: (owner=specified_owner) OR (is_public=1)
+        search_filter = None
+        if owner is not None:
+            search_filter = Filter(
+                should=[
+                    FieldCondition(
+                        key="owner",
+                        match=MatchValue(value=owner)
+                    ),
+                    FieldCondition(
+                        key="is_public",
+                        match=MatchValue(value=1)
+                    )
+                ]
+            )
+
         if verbose:
             print(f"\n{'='*60}")
             print(f"Query: {query}")
             print(f"Mode: {mode.upper()}")
+            if owner:
+                print(f"Owner filter: {owner} (+ public documents)")
             print(f"{'='*60}\n")
 
         results = {}
@@ -526,7 +547,8 @@ class PDFVectorizer:
             summary_search_results = self.qdrant_client.search(
                 collection_name=self.collection_name,
                 query_vector=("summary_vector", query_embedding),
-                limit=limit
+                limit=limit,
+                query_filter=search_filter
             )
 
             summary_results = []
@@ -559,7 +581,8 @@ class PDFVectorizer:
             content_search_results = self.qdrant_client.search(
                 collection_name=self.collection_name,
                 query_vector=("content_vector", query_embedding),
-                limit=limit
+                limit=limit,
+                query_filter=search_filter
             )
 
             content_results = []
@@ -824,3 +847,110 @@ class PDFVectorizer:
                 "is_public": is_public,
                 "error": str(e)
             }
+
+    def get_document_list(
+        self,
+        owner: str,
+        verbose: bool = True
+    ) -> List[Dict]:
+        """
+        Get list of all documents accessible by the owner.
+        Returns documents owned by the owner OR public documents (is_public=1).
+        Results are deduplicated by filename.
+
+        Args:
+            owner: Owner to filter by
+            verbose: Whether to print progress
+
+        Returns:
+            List of dictionaries containing:
+            {
+                "filename": document filename,
+                "owner": document owner,
+                "is_public": visibility (0=private, 1=public),
+                "point_id": first point ID for this document,
+                "page_count": number of pages in this document
+            }
+
+        Note: Does NOT include content or summary, only metadata.
+        """
+        if verbose:
+            print(f"\n{'='*60}")
+            print(f"获取文档列表")
+            print(f"Owner: {owner} (包括公开文档)")
+            print(f"{'='*60}\n")
+
+        try:
+            # Get all points that match: owner=specified_owner OR is_public=1
+            scroll_result = self.qdrant_client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=Filter(
+                    should=[
+                        FieldCondition(
+                            key="owner",
+                            match=MatchValue(value=owner)
+                        ),
+                        FieldCondition(
+                            key="is_public",
+                            match=MatchValue(value=1)
+                        )
+                    ]
+                ),
+                limit=10000,  # Get all matching documents
+                with_payload=True,
+                with_vectors=False
+            )
+
+            points = scroll_result[0]
+
+            if not points:
+                if verbose:
+                    print(f"⚠ 未找到任何文档")
+                return []
+
+            # Group by filename and collect metadata
+            documents_dict = {}
+            for point in points:
+                filename = point.payload.get("filename")
+                doc_owner = point.payload.get("owner")
+                is_public = point.payload.get("is_public", 0)
+
+                if filename not in documents_dict:
+                    documents_dict[filename] = {
+                        "filename": filename,
+                        "owner": doc_owner,
+                        "is_public": is_public,
+                        "point_id": point.id,
+                        "page_count": 1
+                    }
+                else:
+                    # Increment page count
+                    documents_dict[filename]["page_count"] += 1
+
+            # Convert to list
+            document_list = list(documents_dict.values())
+
+            # Sort by filename
+            document_list.sort(key=lambda x: x["filename"])
+
+            if verbose:
+                print(f"找到 {len(document_list)} 个文档:\n")
+                for i, doc in enumerate(document_list, 1):
+                    visibility_str = "公开" if doc["is_public"] == 1 else "私有"
+                    print(f"{i}. {doc['filename']}")
+                    print(f"   所有者: {doc['owner']}")
+                    print(f"   可见性: {visibility_str}")
+                    print(f"   页数: {doc['page_count']}")
+                    print(f"   Point ID: {doc['point_id']}")
+                    print()
+
+                print(f"{'='*60}")
+                print(f"总计: {len(document_list)} 个文档")
+                print(f"{'='*60}\n")
+
+            return document_list
+
+        except Exception as e:
+            if verbose:
+                print(f"\n✗ 获取文档列表失败: {e}")
+            return []
