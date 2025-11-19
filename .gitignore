@@ -40,7 +40,7 @@ Thumbs.db
 /tmp/
 test_output.json
 
-# 只保留 pdf2json_module
+# 只保留 pdf_to_json
 /pdf_to_json.py
 /test_converter.py
 /simple_test.py

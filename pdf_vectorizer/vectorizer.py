@@ -13,9 +13,9 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, NamedVector, Filter, FieldCondition, MatchValue
 import sys
 
-# Import pdf2json_module
+# Import pdf_to_json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pdf2json_module import PDFToJSONConverter
+from pdf_to_json import PDFToJSONConverter
 
 
 class VectorizationProgress:
@@ -73,7 +73,7 @@ class PDFVectorizer:
     Vectorize PDF content and store in Qdrant database.
 
     Features:
-    - Parse PDF using pdf2json_module
+    - Parse PDF using pdf_to_json
     - Generate summary for each page using LLM
     - Vectorize both summary and full content (dual vectors)
     - Store in Qdrant with metadata

@@ -15,7 +15,7 @@
 
 ```
 pdf2json/
-├── pdf2json_module/          # 核心模块
+├── pdf_to_json/          # 核心模块
 │   ├── __init__.py           # 模块初始化
 │   └── converter.py          # 转换器实现
 ├── pdf_to_json.py            # 命令行工具（原始脚本）
@@ -36,7 +36,7 @@ pip install PyMuPDF openai
 #### 基本用法（仅提取文本）
 
 ```python
-from pdf2json_module import PDFToJSONConverter
+from pdf_to_json import PDFToJSONConverter
 
 # 创建转换器实例
 converter = PDFToJSONConverter()
@@ -55,7 +55,7 @@ for page in result['pages']:
 #### 启用AI图片分析
 
 ```python
-from pdf2json_module import PDFToJSONConverter
+from pdf_to_json import PDFToJSONConverter
 
 # 使用API Key初始化
 converter = PDFToJSONConverter(api_key="your-dashscope-api-key")
@@ -71,7 +71,7 @@ result = converter.convert(
 #### 直接保存为JSON文件
 
 ```python
-from pdf2json_module import PDFToJSONConverter
+from pdf_to_json import PDFToJSONConverter
 
 converter = PDFToJSONConverter()
 converter.convert_to_file(
@@ -84,7 +84,7 @@ converter.convert_to_file(
 #### 获取JSON字符串
 
 ```python
-from pdf2json_module import PDFToJSONConverter
+from pdf_to_json import PDFToJSONConverter
 
 converter = PDFToJSONConverter()
 json_string = converter.convert_to_json_string("document.pdf")
@@ -209,7 +209,7 @@ python test_converter.py sample.pdf
 ### 场景1：批量处理PDF文件
 
 ```python
-from pdf2json_module import PDFToJSONConverter
+from pdf_to_json import PDFToJSONConverter
 import os
 
 converter = PDFToJSONConverter()
@@ -229,7 +229,7 @@ for filename in os.listdir(pdf_dir):
 ### 场景2：提取特定页面的内容
 
 ```python
-from pdf2json_module import PDFToJSONConverter
+from pdf_to_json import PDFToJSONConverter
 
 converter = PDFToJSONConverter()
 result = converter.convert("document.pdf")
@@ -243,7 +243,7 @@ for para in page_3_paragraphs:
 ### 场景3：与其他系统集成
 
 ```python
-from pdf2json_module import PDFToJSONConverter
+from pdf_to_json import PDFToJSONConverter
 import requests
 
 converter = PDFToJSONConverter()
