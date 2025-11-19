@@ -146,13 +146,9 @@ class PDFVectorizer:
             collection_names = [c.name for c in collections.collections]
 
             if self.collection_name in collection_names:
-                # Collection exists, try to delete and recreate to ensure correct schema
-                print(f"Collection {self.collection_name} exists, recreating...")
-                try:
-                    self.qdrant_client.delete_collection(collection_name=self.collection_name)
-                    print(f"✓ Deleted existing collection: {self.collection_name}")
-                except:
-                    pass
+                # Collection exists, use it directly
+                print(f"✓ Collection {self.collection_name} already exists, using it")
+                return
 
             # Create collection with dual named vectors (summary + content)
             self.qdrant_client.create_collection(
