@@ -218,8 +218,16 @@ def create_app():
         is_public = int(request.form.get('is_public', 0))
 
         # Save uploaded file
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(config.UPLOAD_FOLDER, filename)
+        # Keep original filename for database, use secure name for file system
+        original_filename = file.filename
+        safe_filename = secure_filename(file.filename)
+
+        # If secure_filename removes all characters (e.g., Chinese names), use timestamp
+        if not safe_filename or safe_filename == os.path.splitext(original_filename)[1].lstrip('.'):
+            import time
+            safe_filename = f"{int(time.time() * 1000)}_{original_filename}"
+
+        filepath = os.path.join(config.UPLOAD_FOLDER, safe_filename)
         file.save(filepath)
 
         def generate_progress():
@@ -227,7 +235,7 @@ def create_app():
             try:
                 # Start vectorization in background
                 def vectorize():
-                    vectorizer.vectorize_pdf(filepath, owner=owner, is_public=is_public, verbose=False)
+                    vectorizer.vectorize_pdf(filepath, owner=owner, is_public=is_public, display_filename=original_filename, verbose=False)
 
                 thread = threading.Thread(target=vectorize)
                 thread.start()

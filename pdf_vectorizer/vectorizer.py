@@ -281,7 +281,7 @@ class PDFVectorizer:
             if verbose:
                 print(f"⚠ Warning: Failed to delete existing pages: {e}")
 
-    def vectorize_pdf(self, pdf_path: str, owner: str, is_public: int = 0, verbose: bool = True) -> Dict:
+    def vectorize_pdf(self, pdf_path: str, owner: str, is_public: int = 0, display_filename: str = None, verbose: bool = True) -> Dict:
         """
         Vectorize entire PDF and store in Qdrant.
         Uses dual-vector strategy: summary_vector + content_vector
@@ -291,6 +291,7 @@ class PDFVectorizer:
             pdf_path: Path to PDF file
             owner: Owner of the document
             is_public: Whether the document is public (1) or private (0), default is 0 (private)
+            display_filename: Optional display filename to use in database (useful for preserving original names with special characters)
             verbose: Whether to print progress
 
         Returns:
@@ -299,7 +300,8 @@ class PDFVectorizer:
         # Reset progress
         self.progress.reset()
 
-        filename = os.path.basename(pdf_path)
+        # Use display_filename if provided, otherwise extract from path
+        filename = display_filename if display_filename else os.path.basename(pdf_path)
 
         # Update progress: Initialization
         self.progress.update(
@@ -337,7 +339,7 @@ class PDFVectorizer:
 
         if verbose:
             print("\nStep 1: Parsing PDF...")
-        result = self.pdf_converter.convert(pdf_path, analyze_images=False, verbose=False)
+        result = self.pdf_converter.convert(pdf_path, analyze_images=True, verbose=False)
 
         total_pages = result['total_pages']
         self.progress.update(
@@ -352,7 +354,26 @@ class PDFVectorizer:
         # Step 2-5: Process each page
         self.progress.update(stage="processing")
         points = []
-        point_id = 0
+
+        # Get the maximum point_id from existing data to avoid ID conflicts
+        try:
+            collection_info = self.qdrant_client.get_collection(self.collection_name)
+            if collection_info.points_count > 0:
+                # Scroll through all points to find max ID
+                scroll_result = self.qdrant_client.scroll(
+                    collection_name=self.collection_name,
+                    limit=10000,
+                    with_payload=False,
+                    with_vectors=False
+                )
+                existing_ids = [point.id for point in scroll_result[0]]
+                point_id = max(existing_ids) + 1 if existing_ids else 0
+            else:
+                point_id = 0
+        except Exception as e:
+            if verbose:
+                print(f"⚠ Warning: Could not get max point_id, starting from 0: {e}")
+            point_id = 0
 
         for page in result['pages']:
             page_number = page['page_number']
