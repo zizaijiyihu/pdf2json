@@ -281,7 +281,7 @@ class PDFVectorizer:
             if verbose:
                 print(f"⚠ Warning: Failed to delete existing pages: {e}")
 
-    def vectorize_pdf(self, pdf_path: str, owner: str, verbose: bool = True) -> Dict:
+    def vectorize_pdf(self, pdf_path: str, owner: str, is_public: int = 0, verbose: bool = True) -> Dict:
         """
         Vectorize entire PDF and store in Qdrant.
         Uses dual-vector strategy: summary_vector + content_vector
@@ -290,6 +290,7 @@ class PDFVectorizer:
         Args:
             pdf_path: Path to PDF file
             owner: Owner of the document
+            is_public: Whether the document is public (1) or private (0), default is 0 (private)
             verbose: Whether to print progress
 
         Returns:
@@ -418,7 +419,8 @@ class PDFVectorizer:
                     "filename": filename,
                     "page_number": page_number,
                     "summary": summary,
-                    "content": page_content
+                    "content": page_content,
+                    "is_public": is_public  # 0 = private (default), 1 = public
                 }
             )
             points.append(point)
@@ -605,7 +607,7 @@ class PDFVectorizer:
             filename: Document filename
             page_numbers: List of page numbers to retrieve
             fields: List of fields to return. If None, returns all fields.
-                   Available fields: "filename", "page_number", "summary", "content", "owner"
+                   Available fields: "filename", "page_number", "summary", "content", "owner", "is_public"
             owner: Optional owner filter. If provided, only returns pages for this owner.
             verbose: Whether to print progress
 
@@ -632,7 +634,7 @@ class PDFVectorizer:
             print(f"{'='*60}\n")
 
         # Available fields in payload
-        available_fields = {"filename", "page_number", "summary", "content", "owner"}
+        available_fields = {"filename", "page_number", "summary", "content", "owner", "is_public"}
 
         # If no fields specified, return all
         if fields is None:
@@ -704,3 +706,121 @@ class PDFVectorizer:
             print(f"{'='*60}\n")
 
         return results
+
+    def update_document_visibility(
+        self,
+        filename: str,
+        owner: str,
+        is_public: int,
+        verbose: bool = True
+    ) -> Dict:
+        """
+        Update the visibility (public/private) of all pages in a document.
+
+        Args:
+            filename: Document filename
+            owner: Owner of the document
+            is_public: 1 for public, 0 for private
+            verbose: Whether to print progress
+
+        Returns:
+            Dictionary with update results:
+            {
+                "success": True/False,
+                "updated_count": number of pages updated,
+                "filename": filename,
+                "owner": owner,
+                "is_public": new visibility status
+            }
+        """
+        if is_public not in [0, 1]:
+            raise ValueError("is_public must be 0 (private) or 1 (public)")
+
+        if verbose:
+            visibility_str = "公开" if is_public == 1 else "私有"
+            print(f"\n{'='*60}")
+            print(f"更新文档可见性")
+            print(f"文件名: {filename}")
+            print(f"所有者: {owner}")
+            print(f"设置为: {visibility_str}")
+            print(f"{'='*60}\n")
+
+        try:
+            # Step 1: Get all points for this document
+            scroll_result = self.qdrant_client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="filename",
+                            match=MatchValue(value=filename)
+                        ),
+                        FieldCondition(
+                            key="owner",
+                            match=MatchValue(value=owner)
+                        )
+                    ]
+                ),
+                limit=1000,  # Assume max 1000 pages per document
+                with_payload=True,
+                with_vectors=False
+            )
+
+            points = scroll_result[0]
+
+            if not points:
+                if verbose:
+                    print(f"⚠ 未找到文档: {filename} (owner: {owner})")
+                return {
+                    "success": False,
+                    "updated_count": 0,
+                    "filename": filename,
+                    "owner": owner,
+                    "is_public": is_public,
+                    "error": "Document not found"
+                }
+
+            # Step 2: Update each point's is_public field
+            updated_count = 0
+            for point in points:
+                # Update the payload
+                new_payload = point.payload.copy()
+                new_payload["is_public"] = is_public
+
+                # Set the updated payload
+                self.qdrant_client.set_payload(
+                    collection_name=self.collection_name,
+                    payload={"is_public": is_public},
+                    points=[point.id]
+                )
+                updated_count += 1
+
+                if verbose:
+                    print(f"  ✓ 更新第 {point.payload['page_number']} 页")
+
+            if verbose:
+                visibility_str = "公开" if is_public == 1 else "私有"
+                print(f"\n{'='*60}")
+                print(f"✓ 成功更新 {updated_count} 页为{visibility_str}")
+                print(f"{'='*60}\n")
+
+            return {
+                "success": True,
+                "updated_count": updated_count,
+                "filename": filename,
+                "owner": owner,
+                "is_public": is_public
+            }
+
+        except Exception as e:
+            if verbose:
+                print(f"\n✗ 更新失败: {e}")
+
+            return {
+                "success": False,
+                "updated_count": 0,
+                "filename": filename,
+                "owner": owner,
+                "is_public": is_public,
+                "error": str(e)
+            }
