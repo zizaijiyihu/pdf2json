@@ -44,5 +44,8 @@ test_output.json
 /pdf_to_json.py
 /test_converter.py
 /simple_test.py
+/service_demo.py
+/test_progress_new.py
 /README.md
 /requirements.txt
+/claude.md
