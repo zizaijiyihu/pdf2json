@@ -593,3 +593,118 @@ class PDFVectorizer:
             print(f"{'='*60}\n")
 
         return results
+
+    def get_pages(
+        self,
+        filename: str,
+        page_numbers: List[int],
+        fields: Optional[List[str]] = None,
+        owner: Optional[str] = None,
+        verbose: bool = False
+    ) -> List[Dict]:
+        """
+        Get page slices by filename and page numbers.
+
+        Args:
+            filename: Document filename
+            page_numbers: List of page numbers to retrieve
+            fields: List of fields to return. If None, returns all fields.
+                   Available fields: "filename", "page_number", "summary", "content", "owner"
+            owner: Optional owner filter. If provided, only returns pages for this owner.
+            verbose: Whether to print progress
+
+        Returns:
+            List of dictionaries containing requested fields for each page.
+            Pages are returned in the same order as page_numbers.
+            If a page is not found, it will not be included in the results.
+
+        Example:
+            # Get summary and content for pages 1, 3, 5
+            results = vectorizer.get_pages(
+                filename="document.pdf",
+                page_numbers=[1, 3, 5],
+                fields=["page_number", "summary", "content"]
+            )
+        """
+        if verbose:
+            print(f"\n{'='*60}")
+            print(f"Retrieving pages from: {filename}")
+            print(f"Page numbers: {page_numbers}")
+            print(f"Fields: {fields or 'all'}")
+            if owner:
+                print(f"Owner filter: {owner}")
+            print(f"{'='*60}\n")
+
+        # Available fields in payload
+        available_fields = {"filename", "page_number", "summary", "content", "owner"}
+
+        # If no fields specified, return all
+        if fields is None:
+            fields = list(available_fields)
+        else:
+            # Validate requested fields
+            invalid_fields = set(fields) - available_fields
+            if invalid_fields:
+                raise ValueError(f"Invalid fields: {invalid_fields}. Available fields: {available_fields}")
+
+        results = []
+
+        # Query each page number
+        for page_num in page_numbers:
+            try:
+                # Build filter conditions
+                filter_conditions = [
+                    FieldCondition(
+                        key="filename",
+                        match=MatchValue(value=filename)
+                    ),
+                    FieldCondition(
+                        key="page_number",
+                        match=MatchValue(value=page_num)
+                    )
+                ]
+
+                # Add owner filter if provided
+                if owner:
+                    filter_conditions.append(
+                        FieldCondition(
+                            key="owner",
+                            match=MatchValue(value=owner)
+                        )
+                    )
+
+                # Search for this specific page
+                scroll_result = self.qdrant_client.scroll(
+                    collection_name=self.collection_name,
+                    scroll_filter=Filter(must=filter_conditions),
+                    limit=1
+                )
+
+                # If page found, extract requested fields
+                if scroll_result[0]:
+                    point = scroll_result[0][0]
+                    page_data = {}
+
+                    for field in fields:
+                        if field in point.payload:
+                            page_data[field] = point.payload[field]
+
+                    results.append(page_data)
+
+                    if verbose:
+                        print(f"✓ Found page {page_num}")
+                else:
+                    if verbose:
+                        print(f"✗ Page {page_num} not found")
+
+            except Exception as e:
+                if verbose:
+                    print(f"✗ Error retrieving page {page_num}: {e}")
+                continue
+
+        if verbose:
+            print(f"\n{'='*60}")
+            print(f"Retrieved {len(results)} out of {len(page_numbers)} requested pages")
+            print(f"{'='*60}\n")
+
+        return results

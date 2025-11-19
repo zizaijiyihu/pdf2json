@@ -64,6 +64,66 @@ def test_vectorize_pdf(pdf_path, owner="hu"):
     return vectorizer
 
 
+def test_get_pages(vectorizer, filename):
+    """Test getting specific pages by filename and page numbers"""
+    print("\n\n" + "="*60)
+    print("Test: Get Specific Pages")
+    print("="*60)
+
+    # Test 1: Get all fields for pages 1 and 2
+    print("\n[Test 1] Get all fields for pages 1 and 2")
+    print("-"*60)
+    results = vectorizer.get_pages(
+        filename=filename,
+        page_numbers=[1, 2],
+        verbose=True
+    )
+
+    print("\nResults:")
+    for page in results:
+        print(f"\n--- Page {page.get('page_number')} ---")
+        print(f"Owner: {page.get('owner')}")
+        print(f"Filename: {page.get('filename')}")
+        print(f"\nSummary:")
+        print(page.get('summary', 'N/A'))
+        print(f"\nContent (first 300 chars):")
+        content = page.get('content', 'N/A')
+        print(content[:300] if content != 'N/A' else 'N/A')
+        if len(content) > 300:
+            print("...")
+
+    # Test 2: Get only specific fields
+    print("\n\n[Test 2] Get only page_number and summary for pages 1, 2, 3")
+    print("-"*60)
+    results = vectorizer.get_pages(
+        filename=filename,
+        page_numbers=[1, 2, 3],
+        fields=["page_number", "summary"],
+        verbose=True
+    )
+
+    print("\nResults:")
+    for page in results:
+        print(f"\n📄 Page {page.get('page_number')}:")
+        print(page.get('summary', 'N/A'))
+
+    # Test 3: Get with owner filter
+    print("\n\n[Test 3] Get pages 1-2 with owner filter")
+    print("-"*60)
+    results = vectorizer.get_pages(
+        filename=filename,
+        page_numbers=[1, 2],
+        fields=["page_number", "owner", "summary"],
+        owner="hu",
+        verbose=True
+    )
+
+    print("\nResults:")
+    for page in results:
+        print(f"\n📄 Page {page.get('page_number')} (Owner: {page.get('owner')})")
+        print(page.get('summary', 'N/A')[:200] + "...")
+
+
 def test_search(vectorizer):
     """Test searching in the vector database"""
     print("\n\n" + "="*60)
@@ -127,6 +187,10 @@ def main():
     try:
         # Test vectorization
         vectorizer = test_vectorize_pdf(pdf_path, owner=owner)
+
+        # Test get_pages functionality
+        filename = os.path.basename(pdf_path)
+        test_get_pages(vectorizer, filename)
 
         # Test search
         test_search(vectorizer)
