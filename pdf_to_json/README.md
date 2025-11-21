@@ -2,10 +2,12 @@
 
 一个功能强大的Python模块，可将PDF文件转换为结构化的JSON格式，保留文本和图片的相对位置，并支持AI驱动的图片内容分析。
 
+**重要说明**：本模块依赖 `ks_infrastructure` 基础设施服务模块提供 Vision 服务，确保先安装该依赖。
+
 ## 特性
 
 - ✅ **保留相对位置**：按照PDF中的垂直位置排序，保持文本和图片的原始顺序
-- ✅ **AI图片分析**：使用阿里云Qwen视觉大模型分析图片内容（可选）
+- ✅ **AI图片分析**：使用阿里云Qwen视觉大模型分析图片内容（通过 ks_infrastructure 服务）
 - ✅ **智能缓存**：自动缓存重复图片的分析结果，避免重复调用API
 - ✅ **表格识别**：将图片中的表格转换为Markdown格式
 - ✅ **忽略UI元素**：专注于实质性内容，自动忽略logo、icon等装饰性元素
@@ -17,17 +19,31 @@
 pdf2json/
 ├── pdf_to_json/          # 核心模块
 │   ├── __init__.py           # 模块初始化
-│   └── converter.py          # 转换器实现
-├── pdf_to_json.py            # 命令行工具（原始脚本）
-├── test_converter.py         # 测试脚本
+│   └── converter.py          # 转换器实现（使用 ks_infrastructure）
+├── test/                     # 测试目录
+│   └── test_pdf2json.py      # 测试脚本
+├── requirements.txt          # 依赖列表
 └── README.md                 # 本文件
 ```
 
 ## 安装依赖
 
+本模块依赖 `ks_infrastructure` 基础设施服务模块提供 Vision 服务。
+
 ```bash
-pip install PyMuPDF openai
+# 1. 安装 ks_infrastructure 模块
+pip install -e ../ks_infrastructure
+
+# 2. 安装 pdf_to_json 的依赖
+pip install -r requirements.txt
 ```
+
+或者一次性安装：
+
+```bash
+pip install PyMuPDF -e ../ks_infrastructure
+```
+
 
 ## 使用方法
 

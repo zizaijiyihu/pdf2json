@@ -8,8 +8,16 @@ import os
 import json
 import base64
 import fitz  # PyMuPDF
-from openai import OpenAI
 from typing import Optional, Dict, List
+
+# Import vision service from ks_infrastructure
+try:
+    from ks_infrastructure import ks_vision
+except ImportError:
+    raise ImportError(
+        "ks_infrastructure module is required. "
+        "Please install it from the ks_infrastructure directory."
+    )
 
 
 class PDFToJSONConverter:
@@ -18,21 +26,34 @@ class PDFToJSONConverter:
 
     Features:
     - Preserves relative positions of text and images
-    - Optional AI-powered image analysis using Qwen Vision model
+    - Optional AI-powered image analysis using Qwen Vision model (via ks_infrastructure)
     - Caches image analysis to avoid duplicate API calls
     - Supports table recognition in Markdown format
     """
 
-    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None,
+                 model: Optional[str] = None):
         """
         Initialize the converter.
 
         Args:
             api_key: API key for Qwen Vision model (defaults to DASHSCOPE_API_KEY env var)
             base_url: Base URL for API (defaults to Aliyun DashScope)
+            model: Model name to use (defaults to qwen-vl-plus for PDF analysis)
         """
-        self.api_key = api_key or os.getenv("DASHSCOPE_API_KEY")
-        self.base_url = base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        # Initialize vision service from ks_infrastructure
+        vision_kwargs = {}
+        if api_key:
+            vision_kwargs['api_key'] = api_key
+        if base_url:
+            vision_kwargs['base_url'] = base_url
+        if model:
+            vision_kwargs['model'] = model
+        elif 'model' not in vision_kwargs:
+            # Default to qwen-vl-plus for PDF analysis (faster and cheaper)
+            vision_kwargs['model'] = 'qwen-vl-plus'
+
+        self.vision_service = ks_vision(**vision_kwargs)
         self.image_cache = {}
 
     def analyze_image(self, image_base64: str, image_format: str) -> str:
@@ -46,20 +67,8 @@ class PDFToJSONConverter:
         Returns:
             Text description of the image content
         """
-        if not self.api_key:
-            return "Error: API key not configured"
-
-        try:
-            client = OpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url,
-            )
-
-            # Construct data URL for the image
-            data_url = f"data:image/{image_format};base64,{image_base64}"
-
-            # Optimized prompt to ignore UI elements
-            prompt = """请描述图片中的实质性内容信息，遵循以下规则：
+        # Optimized prompt to ignore UI elements
+        prompt = """请描述图片中的实质性内容信息，遵循以下规则：
 
 1. 完全忽略所有装饰性元素：logo、icon、按钮、边框、背景图案等UI元素
 2. 重点关注：文本内容、数据、表格、图表中的关键信息
@@ -69,28 +78,12 @@ class PDFToJSONConverter:
 
 请直接输出内容，不需要前缀说明。"""
 
-            completion = client.chat.completions.create(
-                model="qwen-vl-plus",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": data_url}
-                            },
-                            {
-                                "type": "text",
-                                "text": prompt
-                            }
-                        ]
-                    }
-                ]
-            )
-
-            return completion.choices[0].message.content
-        except Exception as e:
-            return f"Error analyzing image: {str(e)}"
+        # Use ks_infrastructure vision service
+        return self.vision_service.analyze_image(
+            image_base64=image_base64,
+            image_format=image_format,
+            prompt=prompt
+        )
 
     def convert(self, pdf_path: str, analyze_images: bool = False,
                 verbose: bool = False) -> Dict:
