@@ -247,7 +247,7 @@ class PDFVectorizer:
             if verbose:
                 print(f"⚠ Warning: Failed to delete existing pages: {e}")
 
-    def vectorize_pdf(self, pdf_path: str, owner: str, is_public: int = 0, display_filename: str = None, verbose: bool = True) -> Dict:
+    def vectorize_pdf(self, pdf_path: str, owner: str, display_filename: str = None, verbose: bool = True) -> Dict:
         """
         Vectorize entire PDF and store in Qdrant.
         Uses dual-vector strategy: summary_vector + content_vector
@@ -256,7 +256,6 @@ class PDFVectorizer:
         Args:
             pdf_path: Path to PDF file
             owner: Owner of the document
-            is_public: Whether the document is public (1) or private (0), default is 0 (private)
             display_filename: Optional display filename to use in database (useful for preserving original names with special characters)
             verbose: Whether to print progress
 
@@ -407,8 +406,7 @@ class PDFVectorizer:
                         "filename": filename,
                         "page_number": page_number,
                         "summary": summary,
-                        "content": page_content,
-                        "is_public": is_public  # 0 = private (default), 1 = public
+                        "content": page_content
                     }
                 )
                 points.append(point)
@@ -498,13 +496,12 @@ class PDFVectorizer:
     ) -> Dict[str, List[Dict]]:
         """
         Search similar pages by query.
-        Returns documents owned by the specified owner OR public documents (is_public=1).
 
         Args:
             query: Search query
             limit: Number of results to return per path
             mode: Retrieval mode - "dual" (both), "summary" (summary only), "content" (content only)
-            owner: Optional owner filter. Returns owner's documents + public documents
+            owner: Optional owner filter. If provided, only returns documents owned by this user
             verbose: Whether to print results
 
         Returns:
@@ -519,18 +516,14 @@ class PDFVectorizer:
         # Get query embedding
         query_embedding = self._get_embedding(query)
 
-        # Build filter: (owner=specified_owner) OR (is_public=1)
+        # Build filter: owner=specified_owner (if provided)
         search_filter = None
         if owner is not None:
             search_filter = Filter(
-                should=[
+                must=[
                     FieldCondition(
                         key="owner",
                         match=MatchValue(value=owner)
-                    ),
-                    FieldCondition(
-                        key="is_public",
-                        match=MatchValue(value=1)
                     )
                 ]
             )
@@ -540,7 +533,7 @@ class PDFVectorizer:
             print(f"Query: {query}")
             print(f"Mode: {mode.upper()}")
             if owner:
-                print(f"Owner filter: {owner} (+ public documents)")
+                print(f"Owner filter: {owner}")
             print(f"{'='*60}\n")
 
         results = {}
@@ -635,7 +628,7 @@ class PDFVectorizer:
             filename: Document filename
             page_numbers: List of page numbers to retrieve
             fields: List of fields to return. If None, returns all fields.
-                   Available fields: "filename", "page_number", "summary", "content", "owner", "is_public"
+                   Available fields: "filename", "page_number", "summary", "content", "owner"
             owner: Optional owner filter. If provided, only returns pages for this owner.
             verbose: Whether to print progress
 
@@ -662,7 +655,7 @@ class PDFVectorizer:
             print(f"{'='*60}\n")
 
         # Available fields in payload
-        available_fields = {"filename", "page_number", "summary", "content", "owner", "is_public"}
+        available_fields = {"filename", "page_number", "summary", "content", "owner"}
 
         # If no fields specified, return all
         if fields is None:
@@ -735,227 +728,4 @@ class PDFVectorizer:
 
         return results
 
-    def update_document_visibility(
-        self,
-        filename: str,
-        owner: str,
-        is_public: int,
-        verbose: bool = True
-    ) -> Dict:
-        """
-        Update the visibility (public/private) of all pages in a document.
 
-        Args:
-            filename: Document filename
-            owner: Owner of the document
-            is_public: 1 for public, 0 for private
-            verbose: Whether to print progress
-
-        Returns:
-            Dictionary with update results:
-            {
-                "success": True/False,
-                "updated_count": number of pages updated,
-                "filename": filename,
-                "owner": owner,
-                "is_public": new visibility status
-            }
-        """
-        if is_public not in [0, 1]:
-            raise ValueError("is_public must be 0 (private) or 1 (public)")
-
-        if verbose:
-            visibility_str = "公开" if is_public == 1 else "私有"
-            print(f"\n{'='*60}")
-            print(f"更新文档可见性")
-            print(f"文件名: {filename}")
-            print(f"所有者: {owner}")
-            print(f"设置为: {visibility_str}")
-            print(f"{'='*60}\n")
-
-        try:
-            # Step 1: Get all points for this document
-            scroll_result = self.qdrant_client.scroll(
-                collection_name=self.collection_name,
-                scroll_filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="filename",
-                            match=MatchValue(value=filename)
-                        ),
-                        FieldCondition(
-                            key="owner",
-                            match=MatchValue(value=owner)
-                        )
-                    ]
-                ),
-                limit=1000,  # Assume max 1000 pages per document
-                with_payload=True,
-                with_vectors=False
-            )
-
-            points = scroll_result[0]
-
-            if not points:
-                if verbose:
-                    print(f"⚠ 未找到文档: {filename} (owner: {owner})")
-                return {
-                    "success": False,
-                    "updated_count": 0,
-                    "filename": filename,
-                    "owner": owner,
-                    "is_public": is_public,
-                    "error": "Document not found"
-                }
-
-            # Step 2: Update each point's is_public field
-            updated_count = 0
-            for point in points:
-                # Update the payload
-                new_payload = point.payload.copy()
-                new_payload["is_public"] = is_public
-
-                # Set the updated payload
-                self.qdrant_client.set_payload(
-                    collection_name=self.collection_name,
-                    payload={"is_public": is_public},
-                    points=[point.id]
-                )
-                updated_count += 1
-
-                if verbose:
-                    print(f"  ✓ 更新第 {point.payload['page_number']} 页")
-
-            if verbose:
-                visibility_str = "公开" if is_public == 1 else "私有"
-                print(f"\n{'='*60}")
-                print(f"✓ 成功更新 {updated_count} 页为{visibility_str}")
-                print(f"{'='*60}\n")
-
-            return {
-                "success": True,
-                "updated_count": updated_count,
-                "filename": filename,
-                "owner": owner,
-                "is_public": is_public
-            }
-
-        except Exception as e:
-            if verbose:
-                print(f"\n✗ 更新失败: {e}")
-
-            return {
-                "success": False,
-                "updated_count": 0,
-                "filename": filename,
-                "owner": owner,
-                "is_public": is_public,
-                "error": str(e)
-            }
-
-    def get_document_list(
-        self,
-        owner: str,
-        verbose: bool = True
-    ) -> List[Dict]:
-        """
-        Get list of all documents accessible by the owner.
-        Returns documents owned by the owner OR public documents (is_public=1).
-        Results are deduplicated by filename.
-
-        Args:
-            owner: Owner to filter by
-            verbose: Whether to print progress
-
-        Returns:
-            List of dictionaries containing:
-            {
-                "filename": document filename,
-                "owner": document owner,
-                "is_public": visibility (0=private, 1=public),
-                "point_id": first point ID for this document,
-                "page_count": number of pages in this document
-            }
-
-        Note: Does NOT include content or summary, only metadata.
-        """
-        if verbose:
-            print(f"\n{'='*60}")
-            print(f"获取文档列表")
-            print(f"Owner: {owner} (包括公开文档)")
-            print(f"{'='*60}\n")
-
-        try:
-            # Get all points that match: owner=specified_owner OR is_public=1
-            scroll_result = self.qdrant_client.scroll(
-                collection_name=self.collection_name,
-                scroll_filter=Filter(
-                    should=[
-                        FieldCondition(
-                            key="owner",
-                            match=MatchValue(value=owner)
-                        ),
-                        FieldCondition(
-                            key="is_public",
-                            match=MatchValue(value=1)
-                        )
-                    ]
-                ),
-                limit=10000,  # Get all matching documents
-                with_payload=True,
-                with_vectors=False
-            )
-
-            points = scroll_result[0]
-
-            if not points:
-                if verbose:
-                    print(f"⚠ 未找到任何文档")
-                return []
-
-            # Group by filename and collect metadata
-            documents_dict = {}
-            for point in points:
-                filename = point.payload.get("filename")
-                doc_owner = point.payload.get("owner")
-                is_public = point.payload.get("is_public", 0)
-
-                if filename not in documents_dict:
-                    documents_dict[filename] = {
-                        "filename": filename,
-                        "owner": doc_owner,
-                        "is_public": is_public,
-                        "point_id": point.id,
-                        "page_count": 1
-                    }
-                else:
-                    # Increment page count
-                    documents_dict[filename]["page_count"] += 1
-
-            # Convert to list
-            document_list = list(documents_dict.values())
-
-            # Sort by filename
-            document_list.sort(key=lambda x: x["filename"])
-
-            if verbose:
-                print(f"找到 {len(document_list)} 个文档:\n")
-                for i, doc in enumerate(document_list, 1):
-                    visibility_str = "公开" if doc["is_public"] == 1 else "私有"
-                    print(f"{i}. {doc['filename']}")
-                    print(f"   所有者: {doc['owner']}")
-                    print(f"   可见性: {visibility_str}")
-                    print(f"   页数: {doc['page_count']}")
-                    print(f"   Point ID: {doc['point_id']}")
-                    print()
-
-                print(f"{'='*60}")
-                print(f"总计: {len(document_list)} 个文档")
-                print(f"{'='*60}\n")
-
-            return document_list
-
-        except Exception as e:
-            if verbose:
-                print(f"\n✗ 获取文档列表失败: {e}")
-            return []
