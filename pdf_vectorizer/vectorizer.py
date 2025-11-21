@@ -5,17 +5,16 @@ Converts PDF files to vectors and stores them in Qdrant database.
 """
 
 import os
-import json
-import requests
-from typing import Dict, List, Optional
-from openai import OpenAI
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, NamedVector, Filter, FieldCondition, MatchValue
 import sys
+from typing import Dict, List, Optional
+from qdrant_client.models import Distance, VectorParams, PointStruct, NamedVector, Filter, FieldCondition, MatchValue
 
 # Import pdf_to_json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pdf_to_json import PDFToJSONConverter
+
+# Import ks_infrastructure services
+from ks_infrastructure import ks_openai, ks_embedding, ks_qdrant
 
 
 class VectorizationProgress:
@@ -84,13 +83,6 @@ class PDFVectorizer:
 
     def __init__(
         self,
-        openai_api_key: str,
-        openai_base_url: str,
-        openai_model: str,
-        embedding_url: str,
-        embedding_api_key: str,
-        qdrant_url: str,
-        qdrant_api_key: str,
         collection_name: str = "pdf_knowledge_base",
         vector_size: int = 4096
     ):
@@ -98,38 +90,28 @@ class PDFVectorizer:
         Initialize PDFVectorizer.
 
         Args:
-            openai_api_key: OpenAI API key for LLM
-            openai_base_url: OpenAI base URL
-            openai_model: Model name for summarization
-            embedding_url: Embedding service URL
-            embedding_api_key: Embedding service API key
-            qdrant_url: Qdrant server URL
-            qdrant_api_key: Qdrant API key
             collection_name: Qdrant collection name
             vector_size: Vector dimension size
+
+        Note:
+            OpenAI model is automatically configured from ks_infrastructure.
+            Default model: DeepSeek-V3.1-Ksyun (configured in ks_infrastructure/configs/default.py)
         """
         # PDF parser
         self.pdf_converter = PDFToJSONConverter()
 
-        # LLM client for summarization
-        self.llm_client = OpenAI(
-            api_key=openai_api_key,
-            base_url=openai_base_url
-        )
-        self.llm_model = openai_model
+        # LLM client for summarization (using ks_infrastructure)
+        self.llm_client = ks_openai()
 
-        # Embedding service config
-        self.embedding_url = embedding_url
-        self.embedding_headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {embedding_api_key}"
-        }
+        # Get model from ks_infrastructure config
+        from ks_infrastructure.configs.default import OPENAI_CONFIG
+        self.llm_model = OPENAI_CONFIG.get("model", "DeepSeek-V3.1-Ksyun")
 
-        # Qdrant client
-        self.qdrant_client = QdrantClient(
-            url=qdrant_url,
-            api_key=qdrant_api_key
-        )
+        # Embedding service (using ks_infrastructure)
+        self.embedding_service = ks_embedding()
+
+        # Qdrant client (using ks_infrastructure)
+        self.qdrant_client = ks_qdrant()
         self.collection_name = collection_name
         self.vector_size = vector_size
 
@@ -206,7 +188,7 @@ class PDFVectorizer:
 
     def _get_embedding(self, text: str) -> List[float]:
         """
-        Get embedding vector for text using curl-based embedding service.
+        Get embedding vector for text using ks_infrastructure embedding service.
 
         Args:
             text: Text to embed
@@ -215,23 +197,7 @@ class PDFVectorizer:
             Embedding vector
         """
         try:
-            data = {
-                "model": "text-embedding",
-                "input": text,
-                "encoding_format": "float"
-            }
-
-            response = requests.post(
-                self.embedding_url,
-                headers=self.embedding_headers,
-                data=json.dumps(data)
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                return result["data"][0]["embedding"]
-            else:
-                raise Exception(f"Embedding request failed: {response.status_code}, {response.text}")
+            return self.embedding_service.get_embedding_vector(text)
         except Exception as e:
             raise Exception(f"Failed to get embedding: {e}")
 

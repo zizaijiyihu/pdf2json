@@ -29,6 +29,10 @@ def ks_openai(**kwargs) -> OpenAI:
     # 合并默认配置和传入参数
     config = {**OPENAI_CONFIG, **kwargs}
 
+    # 移除 'model' 参数，因为它不是 OpenAI 客户端初始化参数
+    # 'model' 应该在调用 API 时传递（如 chat.completions.create 时）
+    config.pop('model', None)
+
     instance_key = get_instance_key("openai", config)
 
     cached = get_cached_instance(instance_key)

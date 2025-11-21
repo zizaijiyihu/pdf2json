@@ -2,6 +2,95 @@
 
 将PDF文档向量化并存储到Qdrant向量数据库的Python模块，支持实时进度跟踪。
 
+## 🔥 最新改造 (2025-01)
+
+### 改造说明
+
+`PDFVectorizer` 已经重构为使用 `ks_infrastructure` 基础设施服务模块，不再需要手动传递各种服务的连接参数。
+
+### 改造前后对比
+
+**改造前（旧版本）**：
+```python
+from pdf_vectorizer import PDFVectorizer
+
+vectorizer = PDFVectorizer(
+    openai_api_key="your-api-key",
+    openai_base_url="https://api.openai.com",
+    openai_model="gpt-3.5-turbo",
+    embedding_url="http://embedding-service/v1/embeddings",
+    embedding_api_key="embedding-key",
+    qdrant_url="http://qdrant:6333",
+    qdrant_api_key="qdrant-key",
+    collection_name="pdf_knowledge_base",
+    vector_size=4096
+)
+```
+
+**改造后（新版本）**：
+```python
+from pdf_vectorizer import PDFVectorizer
+
+# 简化的初始化 - 所有服务配置自动从 ks_infrastructure 获取
+vectorizer = PDFVectorizer(
+    collection_name="pdf_knowledge_base",  # 可选，默认值
+    vector_size=4096  # 可选，默认值
+)
+
+# 或者使用完全默认配置
+vectorizer = PDFVectorizer()
+```
+
+### 主要改进
+
+1. ✅ **极度简化初始化**: 不再需要传递繁琐的连接参数（9个参数减少到2个可选参数）
+2. ✅ **统一配置管理**: 所有服务配置（包括 OpenAI model）统一在 `ks_infrastructure/configs/default.py` 中管理
+3. ✅ **自动模型配置**: OpenAI 模型自动从 ks_infrastructure 配置读取（默认：DeepSeek-V3.1-Ksyun）
+4. ✅ **自动连接池**: 利用 `ks_infrastructure` 的连接池和缓存机制，提高性能
+5. ✅ **业务逻辑不变**: 所有对外接口保持完全兼容，无需修改现有调用代码
+6. ✅ **更易维护**: 配置与业务逻辑完全分离，修改配置无需修改代码
+
+### 内部实现改动
+
+- **OpenAI服务**: 使用 `ks_openai()` 替代直接创建 `OpenAI` 客户端
+- **Embedding服务**: 使用 `ks_embedding()` 替代直接发送HTTP请求
+- **Qdrant服务**: 使用 `ks_qdrant()` 替代直接创建 `QdrantClient`
+
+### 配置说明
+
+所有服务配置位于 `ks_infrastructure/configs/default.py`：
+```python
+# OpenAI配置（包括默认模型）
+OPENAI_CONFIG = {
+    "api_key": "...",
+    "base_url": "...",
+    "model": "DeepSeek-V3.1-Ksyun"  # 默认模型
+}
+
+# Embedding配置
+EMBEDDING_CONFIG = {
+    "url": "...",
+    "api_key": "..."
+}
+
+# Qdrant配置
+QDRANT_CONFIG = {
+    "url": "...",
+    "api_key": "..."
+}
+```
+
+**注意**: OpenAI 的 `model` 参数会被自动应用于所有 PDF 摘要生成操作。
+
+### 测试验证
+
+运行测试套件验证改造：
+```bash
+python pdf_vectorizer/test/test_vectorizer_refactor.py
+```
+
+---
+
 ## 功能特性
 
 - ✅ **PDF解析**：使用 `pdf_to_json` 将PDF解析为结构化JSON
@@ -32,21 +121,21 @@ pip install PyMuPDF openai requests qdrant-client
 
 ## 快速开始
 
-### 基本用法
+### 基本用法（新版本）
 
 ```python
 from pdf_vectorizer import PDFVectorizer
 
-# 创建向量化器
+# 最简单的方式：使用完全默认配置
+vectorizer = PDFVectorizer()
+
+# 或自定义 collection 和 vector size
 vectorizer = PDFVectorizer(
-    openai_api_key="your-api-key",
-    openai_base_url="https://api.openai.com/v1",
-    openai_model="gpt-4",
-    embedding_url="http://embedding-service/v1/embeddings",
-    embedding_api_key="your-embedding-key",
-    qdrant_url="http://localhost:6333",
-    qdrant_api_key="your-qdrant-key"
+    collection_name="my_knowledge_base",  # 可选
+    vector_size=4096  # 可选
 )
+
+# 注意：OpenAI 模型自动从 ks_infrastructure 配置读取（DeepSeek-V3.1-Ksyun）
 
 # 向量化PDF（默认为私有文档）
 result = vectorizer.vectorize_pdf("document.pdf", owner="user123")

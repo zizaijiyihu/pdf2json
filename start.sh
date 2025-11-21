@@ -37,10 +37,23 @@ cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}项目目录: ${PROJECT_ROOT}${NC}\n"
 
+# 激活 Python 虚拟环境
+VENV_PATH="${VENV_PATH:-$HOME/projects/venv}"
+if [ -f "$VENV_PATH/bin/activate" ]; then
+    source "$VENV_PATH/bin/activate"
+    echo -e "${GREEN}✓ 已激活虚拟环境: $VENV_PATH${NC}"
+    echo -e "  Python: $(which python)"
+    echo -e "  Pip: $(which pip)\n"
+else
+    echo -e "${RED}错误: 未找到虚拟环境 $VENV_PATH${NC}"
+    echo -e "${RED}请先创建虚拟环境或通过 VENV_PATH=/your/venv/path ./start.sh 指定${NC}"
+    exit 1
+fi
+
 # 1. 检查 Python 依赖
 echo -e "${BLUE}[1/4] 检查 Python 依赖...${NC}"
 if [ -f "requirements.txt" ]; then
-    pip3 install -q -r requirements.txt
+    "$VENV_PATH/bin/pip" install -r requirements.txt
     echo -e "${GREEN}✓ Python 依赖已安装${NC}\n"
 else
     echo -e "${RED}警告: 未找到 requirements.txt${NC}\n"

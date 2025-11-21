@@ -30,7 +30,8 @@ QDRANT_CONFIG = {
 # OpenAI大语言模型配置
 OPENAI_CONFIG = {
     "api_key": "85c923cc-9dcf-467a-89d5-285d3798014d",
-    "base_url": "https://kspmas.ksyun.com/v1/"
+    "base_url": "https://kspmas.ksyun.com/v1/",
+    "model": "DeepSeek-V3.1-Ksyun"
 }
 
 # Embedding服务配置

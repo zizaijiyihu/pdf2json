@@ -7,11 +7,14 @@ import json
 import sys
 import os
 from typing import List, Dict, Optional, Any
-from openai import OpenAI
 
 # Import PDFVectorizer
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pdf_vectorizer import PDFVectorizer
+
+# Import ks_infrastructure services
+from ks_infrastructure import ks_openai
+from ks_infrastructure.configs.default import OPENAI_CONFIG
 
 
 class KMAgent:
@@ -60,53 +63,27 @@ class KMAgent:
 
     def __init__(
         self,
-        openai_api_key: str,
-        openai_base_url: str,
-        openai_model: str,
-        embedding_url: str,
-        embedding_api_key: str,
-        qdrant_url: str,
-        qdrant_api_key: str,
-        collection_name: str = "pdf_knowledge_base",
-        vector_size: int = 4096,
         verbose: bool = False
     ):
         """
         Initialize KM Agent
 
         Args:
-            openai_api_key: OpenAI API key for LLM
-            openai_base_url: OpenAI base URL
-            openai_model: Model name for chat
-            embedding_url: Embedding service URL
-            embedding_api_key: Embedding service API key
-            qdrant_url: Qdrant server URL
-            qdrant_api_key: Qdrant API key
-            collection_name: Qdrant collection name
-            vector_size: Vector dimension size
             verbose: Whether to print debug information
+
+        Note:
+            All configuration (OpenAI, embedding, Qdrant) is automatically loaded
+            from ks_infrastructure services. No need to pass any parameters.
         """
         self.verbose = verbose
 
-        # LLM client
-        self.llm_client = OpenAI(
-            api_key=openai_api_key,
-            base_url=openai_base_url
-        )
-        self.llm_model = openai_model
+        # LLM client (using ks_infrastructure)
+        self.llm_client = ks_openai()
+        self.llm_model = OPENAI_CONFIG.get("model", "DeepSeek-V3.1-Ksyun")
 
-        # Vectorizer for knowledge base operations
-        self.vectorizer = PDFVectorizer(
-            openai_api_key=openai_api_key,
-            openai_base_url=openai_base_url,
-            openai_model=openai_model,
-            embedding_url=embedding_url,
-            embedding_api_key=embedding_api_key,
-            qdrant_url=qdrant_url,
-            qdrant_api_key=qdrant_api_key,
-            collection_name=collection_name,
-            vector_size=vector_size
-        )
+        # Vectorizer for knowledge base operations (using ks_infrastructure)
+        # collection_name, vector_size are defaults in PDFVectorizer
+        self.vectorizer = PDFVectorizer()
 
         # Tool definitions for function calling
         self.tools = [

@@ -39,32 +39,11 @@ def init_services():
     """Initialize KM Agent and PDF Vectorizer"""
     global km_agent, vectorizer
 
-    # Initialize KM Agent
-    km_agent = KMAgent(
-        openai_api_key=config.OPENAI_CONFIG["api_key"],
-        openai_base_url=config.OPENAI_CONFIG["base_url"],
-        openai_model=config.OPENAI_CONFIG["model"],
-        embedding_url=config.EMBEDDING_CONFIG["url"],
-        embedding_api_key=config.EMBEDDING_CONFIG["api_key"],
-        qdrant_url=config.QDRANT_CONFIG["url"],
-        qdrant_api_key=config.QDRANT_CONFIG["api_key"],
-        collection_name=config.COLLECTION_NAME,
-        vector_size=config.VECTOR_SIZE,
-        verbose=False
-    )
+    # Initialize KM Agent (uses ks_infrastructure, no parameters needed)
+    km_agent = KMAgent(verbose=False)
 
-    # Initialize PDF Vectorizer
-    vectorizer = PDFVectorizer(
-        openai_api_key=config.OPENAI_CONFIG["api_key"],
-        openai_base_url=config.OPENAI_CONFIG["base_url"],
-        openai_model=config.OPENAI_CONFIG["model"],
-        embedding_url=config.EMBEDDING_CONFIG["url"],
-        embedding_api_key=config.EMBEDDING_CONFIG["api_key"],
-        qdrant_url=config.QDRANT_CONFIG["url"],
-        qdrant_api_key=config.QDRANT_CONFIG["api_key"],
-        collection_name=config.COLLECTION_NAME,
-        vector_size=config.VECTOR_SIZE
-    )
+    # Initialize PDF Vectorizer (uses ks_infrastructure, defaults from pdf_vectorizer)
+    vectorizer = PDFVectorizer()
 
     # Ensure upload directory exists
     os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)

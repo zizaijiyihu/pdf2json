@@ -28,13 +28,18 @@ export async function sendChatMessage(message, history = [], onChunk) {
   let fullContent = ''
   let toolCalls = []
   let finalHistory = null
+  let buffer = '' // 缓冲区，用于处理跨chunk的不完整行
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
 
-    const text = decoder.decode(value)
-    const lines = text.split('\n')
+    // 将新数据追加到缓冲区
+    buffer += decoder.decode(value, { stream: true })
+
+    // 按行分割，但保留最后一个可能不完整的行
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || '' // 最后一行可能不完整，保留到缓冲区
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
@@ -64,6 +69,19 @@ export async function sendChatMessage(message, history = [], onChunk) {
           console.error('Failed to parse SSE data:', e, 'Line:', line)
         }
       }
+    }
+  }
+
+  // 处理缓冲区中剩余的最后一行
+  if (buffer.startsWith('data: ')) {
+    try {
+      const data = JSON.parse(buffer.substring(6))
+      if (data.type === 'done') {
+        finalHistory = data.data.history
+        toolCalls = data.data.tool_calls
+      }
+    } catch (e) {
+      console.error('Failed to parse final SSE data:', e)
     }
   }
 
@@ -118,13 +136,18 @@ export async function uploadPDF(file, owner = 'hu', isPublic = 0, onProgress) {
   const decoder = new TextDecoder()
 
   let result = null
+  let buffer = '' // 缓冲区，用于处理跨chunk的不完整行
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
 
-    const text = decoder.decode(value)
-    const lines = text.split('\n')
+    // 将新数据追加到缓冲区
+    buffer += decoder.decode(value, { stream: true })
+
+    // 按行分割，但保留最后一个可能不完整的行
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || '' // 最后一行可能不完整，保留到缓冲区
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
@@ -153,6 +176,21 @@ export async function uploadPDF(file, owner = 'hu', isPublic = 0, onProgress) {
           }
         }
       }
+    }
+  }
+
+  // 处理缓冲区中剩余的最后一行
+  if (buffer.startsWith('data: ')) {
+    try {
+      const data = JSON.parse(buffer.substring(6))
+      if (onProgress) {
+        onProgress(data)
+      }
+      if (data.stage === 'completed') {
+        result = data
+      }
+    } catch (e) {
+      console.error('Failed to parse final SSE data:', e)
     }
   }
 
