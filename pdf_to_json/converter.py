@@ -4,11 +4,10 @@ PDF to JSON Converter
 Converts PDF files to structured JSON format while preserving text and image positions.
 """
 
-import os
 import json
 import base64
 import fitz  # PyMuPDF
-from typing import Optional, Dict, List
+from typing import Dict
 
 # Import vision service from ks_infrastructure
 try:
@@ -29,31 +28,22 @@ class PDFToJSONConverter:
     - Optional AI-powered image analysis using Qwen Vision model (via ks_infrastructure)
     - Caches image analysis to avoid duplicate API calls
     - Supports table recognition in Markdown format
+
+    Note:
+    - Uses ks_infrastructure.ks_vision() service
+    - No need to configure API keys (managed by ks_infrastructure)
     """
 
-    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None,
-                 model: Optional[str] = None):
+    def __init__(self):
         """
         Initialize the converter.
 
-        Args:
-            api_key: API key for Qwen Vision model (defaults to DASHSCOPE_API_KEY env var)
-            base_url: Base URL for API (defaults to Aliyun DashScope)
-            model: Model name to use (defaults to qwen-vl-plus for PDF analysis)
+        The Vision service is provided by ks_infrastructure and will use
+        configurations from ks_infrastructure/configs/default.py or environment variables.
         """
-        # Initialize vision service from ks_infrastructure
-        vision_kwargs = {}
-        if api_key:
-            vision_kwargs['api_key'] = api_key
-        if base_url:
-            vision_kwargs['base_url'] = base_url
-        if model:
-            vision_kwargs['model'] = model
-        elif 'model' not in vision_kwargs:
-            # Default to qwen-vl-plus for PDF analysis (faster and cheaper)
-            vision_kwargs['model'] = 'qwen-vl-plus'
-
-        self.vision_service = ks_vision(**vision_kwargs)
+        # Get vision service from ks_infrastructure
+        # Use qwen-vl-plus model for PDF analysis (faster and cheaper than qwen-vl-max)
+        self.vision_service = ks_vision(model='qwen-vl-plus')
         self.image_cache = {}
 
     def analyze_image(self, image_base64: str, image_format: str) -> str:

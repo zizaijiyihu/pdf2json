@@ -73,8 +73,8 @@ for page in result['pages']:
 ```python
 from pdf_to_json import PDFToJSONConverter
 
-# 使用API Key初始化
-converter = PDFToJSONConverter(api_key="your-dashscope-api-key")
+# 创建转换器实例（无需配置API Key，由 ks_infrastructure 管理）
+converter = PDFToJSONConverter()
 
 # 转换并分析图片
 result = converter.convert(
@@ -83,6 +83,10 @@ result = converter.convert(
     verbose=True          # 显示进度
 )
 ```
+
+**注意**：Vision API 配置由 `ks_infrastructure` 模块管理，请确保：
+- 已安装 `ks_infrastructure` 模块
+- 已配置 `DASHSCOPE_API_KEY` 环境变量，或在 `ks_infrastructure/configs/default.py` 中配置
 
 #### 直接保存为JSON文件
 
@@ -160,10 +164,15 @@ python test_converter.py sample.pdf
 
 ### PDFToJSONConverter
 
-#### 初始化参数
+#### 初始化
 
-- `api_key` (str, optional): 阿里云DashScope API密钥，默认从环境变量 `DASHSCOPE_API_KEY` 读取
-- `base_url` (str, optional): API基础URL，默认为阿里云DashScope地址
+```python
+converter = PDFToJSONConverter()
+```
+
+**无需参数**：所有配置由 `ks_infrastructure` 模块管理。
+- Vision API 密钥从环境变量 `DASHSCOPE_API_KEY` 读取，或使用 `ks_infrastructure/configs/default.py` 中的配置
+- 自动使用 `qwen-vl-plus` 模型（针对 PDF 分析优化）
 
 #### 方法
 
