@@ -34,21 +34,28 @@
 graph TB
     subgraph "表现层 - Presentation Layer"
         UI[React前端应用]
-        UI_Components[UI组件]
-        UI_Store[状态管理Zustand]
-        UI_API[API客户端]
+        ChatView[ChatView - 聊天界面]
+        ChatMessage[ChatMessage - 消息渲染]
+        KnowledgeSidebar[KnowledgeSidebar - 文档侧边栏]
+        DocumentItem[DocumentItem - 文档项]
+        PdfViewer[PdfViewer - PDF预览器]
+        Store[Zustand状态管理]
+        APIClient[API客户端]
     end
 
     subgraph "应用服务层 - Application Service Layer"
         API[Flask API网关]
-        API_Chat[聊天接口]
-        API_Doc[文档管理接口]
-        API_Upload[上传接口]
-        API_Image[图片分析接口]
+        API_Chat[POST /api/chat - 聊天]
+        API_Doc[GET /api/documents - 文档列表]
+        API_Upload[POST /api/upload - 上传文档]
+        API_Image[POST /api/analyze-image - 图片分析]
+        API_Delete[DELETE /api/documents - 删除文档]
     end
 
     subgraph "领域服务层 - Domain Service Layer"
         KM[知识管理Agent]
+        KM_SearchTool[工具: search_knowledge]
+        KM_Chat[chat_stream方法]
         PDFVec[PDF向量化服务]
         PDFJson[PDF解析服务]
         FileRepo[文件仓库服务]
@@ -56,30 +63,50 @@ graph TB
     end
 
     subgraph "基础设施层 - Infrastructure Layer"
-        MySQL[MySQL服务]
-        MinIO[MinIO对象存储]
-        Qdrant[Qdrant向量数据库]
+        MySQL[MySQL - 元数据存储]
+        MinIO[MinIO - 对象存储]
+        Qdrant[Qdrant - 向量数据库]
         LLM[OpenAI兼容LLM]
         Embedding[Embedding服务]
         Vision[Vision视觉服务]
-        UserInfo[用户信息服务]
     end
 
-    %% 表现层依赖
-    UI --> UI_Components
-    UI_Components --> UI_Store
-    UI_Components --> UI_API
-    UI_API --> API
+    %% 表现层内部依赖
+    UI --> ChatView
+    UI --> KnowledgeSidebar
+    UI --> PdfViewer
+    ChatView --> ChatMessage
+    KnowledgeSidebar --> DocumentItem
+    ChatView --> Store
+    KnowledgeSidebar --> Store
+    ChatView --> APIClient
+    KnowledgeSidebar --> APIClient
 
-    %% 应用服务层依赖
-    API --> API_Chat --> KM
-    API --> API_Doc --> FileRepo
-    API --> API_Upload --> PDFVec
-    API --> API_Upload --> FileRepo
-    API --> API_Image --> ImgRepo
+    %% 表现层到应用服务层
+    APIClient --> API
 
-    %% 领域服务层依赖
-    KM --> PDFVec
+    %% 应用服务层内部
+    API --> API_Chat
+    API --> API_Doc
+    API --> API_Upload
+    API --> API_Image
+    API --> API_Delete
+
+    %% 应用服务层到领域服务层
+    API_Chat --> KM
+    API_Doc --> FileRepo
+    API_Upload --> PDFVec
+    API_Upload --> FileRepo
+    API_Image --> ImgRepo
+    API_Delete --> PDFVec
+    API_Delete --> FileRepo
+
+    %% 领域服务层内部
+    KM --> KM_SearchTool
+    KM --> KM_Chat
+    KM_SearchTool --> PDFVec
+
+    %% 领域服务层到基础设施层
     KM --> LLM
     PDFVec --> PDFJson
     PDFVec --> Qdrant
@@ -89,17 +116,6 @@ graph TB
     ImgRepo --> MinIO
     ImgRepo --> Vision
     ImgRepo --> FileRepo
-
-    %% 样式
-    classDef presentation fill:#e1f5ff,stroke:#01579b
-    classDef application fill:#fff9c4,stroke:#f57f17
-    classDef domain fill:#f3e5f5,stroke:#4a148c
-    classDef infrastructure fill:#e8f5e9,stroke:#1b5e20
-
-    class UI,UI_Components,UI_Store,UI_API presentation
-    class API,API_Chat,API_Doc,API_Upload,API_Image application
-    class KM,PDFVec,PDFJson,FileRepo,ImgRepo domain
-    class MySQL,MinIO,Qdrant,LLM,Embedding,Vision,UserInfo infrastructure
 ```
 
 ### 2.2 分层架构概览
@@ -109,11 +125,6 @@ graph LR
     A[表现层<br/>Presentation] --> B[应用服务层<br/>Application Service]
     B --> C[领域服务层<br/>Domain Service]
     C --> D[基础设施层<br/>Infrastructure]
-    
-    style A fill:#e1f5ff
-    style B fill:#fff9c4
-    style C fill:#f3e5f5
-    style D fill:#e8f5e9
 ```
 
 ---
