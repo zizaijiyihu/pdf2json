@@ -134,7 +134,8 @@ function ChatView() {
         .join('\n\n')
 
       if (imageAnalyses) {
-        fullMessage = `${text}\n\n${imageAnalyses}`
+        // 添加结构化的上下文标识
+        fullMessage = `【我上传了图片，已解析为以下结果】\n\n${imageAnalyses}\n\n【基于上述图片内容，我的问题是】\n\n${text}`
       }
     }
 
