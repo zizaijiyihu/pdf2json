@@ -254,7 +254,7 @@ function ChatView() {
                 {uploadedImages.map(img => (
                   <div
                     key={img.id}
-                    className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200"
+                    className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200"
                   >
                     {/* 缩略图 */}
                     <img
@@ -263,7 +263,7 @@ function ChatView() {
                       className="w-full h-full object-cover"
                     />
 
-                    {/* 状态覆盖层 */}
+                    {/* 状态覆盖层 - 仅上传中显示 */}
                     {img.status === 'uploading' && analyzingImage === img.id && (
                       <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                         <i className="fa fa-spinner fa-spin text-white text-sm mb-1"></i>
@@ -271,25 +271,20 @@ function ChatView() {
                       </div>
                     )}
 
-                    {img.status === 'done' && (
-                      <div className="absolute top-0.5 right-0.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                        <i className="fa fa-check text-white text-[10px]"></i>
-                      </div>
-                    )}
-
+                    {/* 错误状态覆盖层 */}
                     {img.status === 'error' && (
                       <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center">
                         <i className="fa fa-exclamation text-white text-sm"></i>
                       </div>
                     )}
 
-                    {/* 删除按钮 */}
+                    {/* 删除按钮 - 始终显示 */}
                     <button
                       onClick={() => removeImage(img.id)}
-                      className="absolute top-0.5 left-0.5 w-4 h-4 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80 transition-colors"
+                      className="absolute top-0.5 left-0.5 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
                       title="删除"
                     >
-                      <i className="fa fa-times text-white text-[10px]"></i>
+                      <i className="fa fa-times text-white text-xs"></i>
                     </button>
                   </div>
                 ))}
