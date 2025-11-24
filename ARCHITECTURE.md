@@ -34,65 +34,66 @@
 graph TB
     subgraph "表现层 - Presentation Layer"
         UI[React前端应用]
-        ChatView[ChatView - 聊天界面]
-        ChatMessage[ChatMessage - 消息渲染]
-        KnowledgeSidebar[KnowledgeSidebar - 文档侧边栏]
-        DocumentItem[DocumentItem - 文档项]
-        PdfViewer[PdfViewer - PDF预览器]
+        ChatView[ChatView组件]
+        ChatMessage[ChatMessage组件]
+        KnowledgeSidebar[KnowledgeSidebar组件]
+        DocumentItem[DocumentItem组件]
+        PdfViewer[PdfViewer组件]
         Store[Zustand状态管理]
         APIClient[API客户端]
+        
+        UI --> ChatView
+        UI --> KnowledgeSidebar
+        UI --> PdfViewer
+        ChatView --> ChatMessage
+        KnowledgeSidebar --> DocumentItem
+        ChatView --> Store
+        KnowledgeSidebar --> Store
+        ChatView --> APIClient
+        KnowledgeSidebar --> APIClient
     end
 
     subgraph "应用服务层 - Application Service Layer"
         API[Flask API网关]
-        API_Chat[POST /api/chat - 聊天]
-        API_Doc[GET /api/documents - 文档列表]
-        API_Upload[POST /api/upload - 上传文档]
-        API_Image[POST /api/analyze-image - 图片分析]
-        API_Delete[DELETE /api/documents - 删除文档]
+        API_Chat[POST /api/chat]
+        API_Doc[GET /api/documents]
+        API_Upload[POST /api/upload]
+        API_Image[POST /api/analyze-image]
+        API_Delete[DELETE /api/documents]
+        
+        API --> API_Chat
+        API --> API_Doc
+        API --> API_Upload
+        API --> API_Image
+        API --> API_Delete
     end
 
     subgraph "领域服务层 - Domain Service Layer"
         KM[知识管理Agent]
         KM_SearchTool[工具: search_knowledge]
-        KM_Chat[chat_stream方法]
+        KM_Chat[方法: chat_stream]
         PDFVec[PDF向量化服务]
         PDFJson[PDF解析服务]
         FileRepo[文件仓库服务]
         ImgRepo[图片仓库服务]
+        
+        KM --> KM_SearchTool
+        KM --> KM_Chat
+        KM_SearchTool --> PDFVec
     end
 
     subgraph "基础设施层 - Infrastructure Layer"
-        MySQL[MySQL - 元数据存储]
-        MinIO[MinIO - 对象存储]
-        Qdrant[Qdrant - 向量数据库]
+        MySQL[MySQL数据库]
+        MinIO[MinIO对象存储]
+        Qdrant[Qdrant向量数据库]
         LLM[OpenAI兼容LLM]
         Embedding[Embedding服务]
         Vision[Vision视觉服务]
     end
 
-    %% 表现层内部依赖
-    UI --> ChatView
-    UI --> KnowledgeSidebar
-    UI --> PdfViewer
-    ChatView --> ChatMessage
-    KnowledgeSidebar --> DocumentItem
-    ChatView --> Store
-    KnowledgeSidebar --> Store
-    ChatView --> APIClient
-    KnowledgeSidebar --> APIClient
-
-    %% 表现层到应用服务层
+    %% 层间依赖关系
     APIClient --> API
-
-    %% 应用服务层内部
-    API --> API_Chat
-    API --> API_Doc
-    API --> API_Upload
-    API --> API_Image
-    API --> API_Delete
-
-    %% 应用服务层到领域服务层
+    
     API_Chat --> KM
     API_Doc --> FileRepo
     API_Upload --> PDFVec
@@ -100,13 +101,7 @@ graph TB
     API_Image --> ImgRepo
     API_Delete --> PDFVec
     API_Delete --> FileRepo
-
-    %% 领域服务层内部
-    KM --> KM_SearchTool
-    KM --> KM_Chat
-    KM_SearchTool --> PDFVec
-
-    %% 领域服务层到基础设施层
+    
     KM --> LLM
     PDFVec --> PDFJson
     PDFVec --> Qdrant
@@ -121,10 +116,15 @@ graph TB
 ### 2.2 分层架构概览
 
 ```mermaid
-graph LR
-    A[表现层<br/>Presentation] --> B[应用服务层<br/>Application Service]
-    B --> C[领域服务层<br/>Domain Service]
-    C --> D[基础设施层<br/>Infrastructure]
+graph TB
+    A[表现层<br/>Presentation Layer]
+    B[应用服务层<br/>Application Service Layer]
+    C[领域服务层<br/>Domain Service Layer]
+    D[基础设施层<br/>Infrastructure Layer]
+    
+    A --> B
+    B --> C
+    C --> D
 ```
 
 ---
