@@ -71,6 +71,7 @@ graph TB
     subgraph "领域服务层 - Domain Service Layer"
         KM[知识管理Agent]
         KM_SearchTool[工具: search_knowledge]
+        KM_GetPages[工具: get_pages]
         KM_Chat[方法: chat_stream]
         PDFVec[PDF向量化服务]
         PDFJson[PDF解析服务]
@@ -78,8 +79,10 @@ graph TB
         ImgRepo[图片仓库服务]
         
         KM --> KM_SearchTool
+        KM --> KM_GetPages
         KM --> KM_Chat
         KM_SearchTool --> PDFVec
+        KM_GetPages --> PDFVec
     end
 
     subgraph "基础设施层 - Infrastructure Layer"
