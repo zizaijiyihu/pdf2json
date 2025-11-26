@@ -7,19 +7,18 @@ function ChatView() {
   const messages = useStore(state => state.messages)
   const chatHistory = useStore(state => state.chatHistory)
   const isLoading = useStore(state => state.isLoading)
-  const owner = useStore(state => state.owner)
   const addMessage = useStore(state => state.addMessage)
   const updateLastMessage = useStore(state => state.updateLastMessage)
   const setMessages = useStore(state => state.setMessages)
   const setChatHistory = useStore(state => state.setChatHistory)
   const setIsLoading = useStore(state => state.setIsLoading)
   const toggleKnowledgeSidebar = useStore(state => state.toggleKnowledgeSidebar)
+  const toggleInstructionSidebar = useStore(state => state.toggleInstructionSidebar)
 
   const [inputValue, setInputValue] = useState('')
   const [greetingVisible, setGreetingVisible] = useState(true)
   const [uploadedImages, setUploadedImages] = useState([])
   const [analyzingImage, setAnalyzingImage] = useState(null)
-  const [analyzeProgress, setAnalyzeProgress] = useState(0)
 
   const messageContainerRef = useRef(null)
   const inputRef = useRef(null)
@@ -61,15 +60,11 @@ function ChatView() {
       }
       setUploadedImages(prev => [...prev, newImage])
       setAnalyzingImage(imageId)
-      setAnalyzeProgress(0)
 
       // 3. 上传并分析
-      setAnalyzeProgress(20)
-      const result = await analyzeImage(file, owner)
-      setAnalyzeProgress(60)
+      const result = await analyzeImage(file)
 
       if (result.success) {
-        setAnalyzeProgress(100)
         // 4. 更新图片信息
         setUploadedImages(prev => prev.map(img =>
           img.id === imageId
@@ -92,7 +87,6 @@ function ChatView() {
     } finally {
       setTimeout(() => {
         setAnalyzingImage(null)
-        setAnalyzeProgress(0)
       }, 500)
     }
   }
@@ -266,9 +260,8 @@ function ChatView() {
 
                     {/* 状态覆盖层 - 仅上传中显示 */}
                     {img.status === 'uploading' && analyzingImage === img.id && (
-                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-                        <i className="fa fa-spinner fa-spin text-white text-sm mb-1"></i>
-                        <span className="text-white text-xs">{analyzeProgress}%</span>
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                        <i className="fa fa-spinner fa-spin text-white text-lg"></i>
                       </div>
                     )}
 
@@ -312,6 +305,13 @@ function ChatView() {
 
               {/* 工具按钮组 - 绝对定位在右下角 */}
               <div className="absolute right-0 bottom-0 flex space-x-2">
+                <button
+                  onClick={toggleInstructionSidebar}
+                  className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors"
+                  title="我的指示"
+                >
+                  <i className="fa fa-lightbulb-o" aria-hidden="true"></i>
+                </button>
                 <button
                   onClick={toggleKnowledgeSidebar}
                   className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors"
