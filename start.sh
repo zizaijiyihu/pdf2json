@@ -75,7 +75,7 @@ fi
 
 # 3. 启动后端 API 服务
 echo -e "${BLUE}[3/4] 启动后端 API 服务 (端口 5000)...${NC}"
-python3 -m app_api.api > /tmp/km_agent_api.log 2>&1 &
+python3 -u -m app_api.api 2>&1 | tee /tmp/km_agent_api.log &
 API_PID=$!
 echo -e "${GREEN}✓ 后端服务已启动 (PID: $API_PID)${NC}"
 echo -e "  日志文件: /tmp/km_agent_api.log\n"

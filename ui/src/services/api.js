@@ -94,11 +94,12 @@ export async function sendChatMessage(message, history = [], onChunk) {
 
 /**
  * 获取文档列表
- * @param {string} owner - 用户名
  * @returns {Promise<Object>} 文档列表
  */
-export async function getDocuments(owner = 'hu') {
-  const response = await fetch(`${API_BASE_URL}/documents?owner=${encodeURIComponent(owner)}`)
+export async function getDocuments() {
+  const url = `${API_BASE_URL}/documents`
+
+  const response = await fetch(url)
 
   if (!response.ok) {
     const error = await response.json()
@@ -111,15 +112,13 @@ export async function getDocuments(owner = 'hu') {
 /**
  * 上传并向量化PDF
  * @param {File} file - PDF文件
- * @param {string} owner - 用户名
  * @param {number} isPublic - 是否公开 (0=私有, 1=公开)
  * @param {Function} onProgress - 进度回调
  * @returns {Promise<Object>} 上传结果
  */
-export async function uploadPDF(file, owner = 'hu', isPublic = 0, onProgress) {
+export async function uploadPDF(file, isPublic = 0, onProgress) {
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('owner', owner)
   formData.append('is_public', isPublic.toString())
 
   const response = await fetch(`${API_BASE_URL}/upload`, {
@@ -200,14 +199,12 @@ export async function uploadPDF(file, owner = 'hu', isPublic = 0, onProgress) {
 /**
  * 删除文档
  * @param {string} filename - 文件名
- * @param {string} owner - 用户名
  * @returns {Promise<Object>} 删除结果
  */
-export async function deleteDocument(filename, owner = 'hu') {
-  const response = await fetch(
-    `${API_BASE_URL}/documents/${encodeURIComponent(filename)}?owner=${encodeURIComponent(owner)}`,
-    { method: 'DELETE' }
-  )
+export async function deleteDocument(filename) {
+  const url = `${API_BASE_URL}/documents/${encodeURIComponent(filename)}`
+
+  const response = await fetch(url, { method: 'DELETE' })
 
   if (!response.ok) {
     const error = await response.json()
@@ -220,21 +217,19 @@ export async function deleteDocument(filename, owner = 'hu') {
 /**
  * 修改文档可见性
  * @param {string} filename - 文件名
- * @param {string} owner - 用户名
  * @param {number} isPublic - 是否公开 (0=私有, 1=公开)
  * @returns {Promise<Object>} 更新结果
  */
-export async function updateDocumentVisibility(filename, owner = 'hu', isPublic) {
-  const response = await fetch(
-    `${API_BASE_URL}/documents/${encodeURIComponent(filename)}/visibility?owner=${encodeURIComponent(owner)}`,
-    {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ is_public: isPublic })
-    }
-  )
+export async function updateDocumentVisibility(filename, isPublic) {
+  const url = `${API_BASE_URL}/documents/${encodeURIComponent(filename)}/visibility`
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ is_public: isPublic })
+  })
 
   if (!response.ok) {
     const error = await response.json()
@@ -247,14 +242,12 @@ export async function updateDocumentVisibility(filename, owner = 'hu', isPublic)
 /**
  * 上传并分析图片
  * @param {File} file - 图片文件
- * @param {string} username - 用户名
  * @param {string} prompt - 可选的分析提示词
  * @returns {Promise<Object>} 分析结果
  */
-export async function analyzeImage(file, username = 'hu', prompt = null) {
+export async function analyzeImage(file, prompt = null) {
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('username', username)
   if (prompt) {
     formData.append('prompt', prompt)
   }
@@ -278,5 +271,94 @@ export async function analyzeImage(file, username = 'hu', prompt = null) {
  */
 export async function checkHealth() {
   const response = await fetch(`${API_BASE_URL}/health`)
+  return response.json()
+}
+
+/**
+ * 获取用户指示列表
+ * @returns {Promise<Object>} 指示列表
+ */
+export async function getInstructions() {
+  const url = `${API_BASE_URL}/instructions`
+
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to fetch instructions')
+  }
+
+  return response.json()
+}
+
+/**
+ * 创建新指示
+ * @param {string} content - 指示内容
+ * @param {number} priority - 优先级
+ * @returns {Promise<Object>} 创建结果
+ */
+export async function createInstruction(content, priority = 0) {
+  const body = { content, priority }
+
+  const response = await fetch(`${API_BASE_URL}/instructions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body)
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to create instruction')
+  }
+
+  return response.json()
+}
+
+/**
+ * 更新指示
+ * @param {number} id - 指示ID
+ * @param {Object} data - 更新数据 {content, is_active, priority}
+ * @returns {Promise<Object>} 更新结果
+ */
+export async function updateInstruction(id, data) {
+  const body = { ...data }
+
+  const response = await fetch(`${API_BASE_URL}/instructions/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body)
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to update instruction')
+  }
+
+  return response.json()
+}
+
+/**
+ * 删除指示
+ * @param {number} id - 指示ID
+ * @returns {Promise<Object>} 删除结果
+ */
+export async function deleteInstruction(id) {
+  const response = await fetch(`${API_BASE_URL}/instructions/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({})
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to delete instruction')
+  }
+
   return response.json()
 }

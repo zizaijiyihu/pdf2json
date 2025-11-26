@@ -1,6 +1,7 @@
 import React from 'react'
 import ChatView from './components/ChatView'
 import KnowledgeSidebar from './components/KnowledgeSidebar'
+import InstructionSidebar from './components/InstructionSidebar'
 import PdfViewer from './components/PdfViewer'
 
 function App() {
@@ -13,6 +14,9 @@ function App() {
 
         {/* 知识文档侧边栏 */}
         <KnowledgeSidebar />
+
+        {/* 指示侧边栏 */}
+        <InstructionSidebar />
 
         {/* PDF浏览器 */}
         <PdfViewer />

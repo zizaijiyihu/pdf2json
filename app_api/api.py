@@ -27,6 +27,7 @@ from pdf_vectorizer import PDFVectorizer
 import file_repository
 from tmp_image_repository import analyze_temp_image
 from app_api import config
+from ks_infrastructure import get_current_user
 
 
 # Global instances
@@ -55,7 +56,7 @@ def get_or_create_km_agent(owner: str):
     global km_agent_cache
     
     if owner not in km_agent_cache:
-        km_agent_cache[owner] = KMAgent(verbose=False, owner=owner)
+        km_agent_cache[owner] = KMAgent(verbose=True, owner=owner)
     
     return km_agent_cache[owner]
 
@@ -65,7 +66,7 @@ def init_services():
     global km_agent, vectorizer
 
     # Initialize KM Agent (uses ks_infrastructure, no parameters needed)
-    km_agent = KMAgent(verbose=False)
+    km_agent = KMAgent(verbose=True)
 
     # Initialize PDF Vectorizer (uses ks_infrastructure, defaults from pdf_vectorizer)
     vectorizer = PDFVectorizer()
@@ -93,8 +94,9 @@ def create_app():
         {
             "message": "user question",
             "history": [...]  // optional, conversation history
-            "owner": "username" // optional, defaults to config.DEFAULT_USER
         }
+
+        Note: User identification is handled server-side via get_current_user()
 
         Response: Server-Sent Events (SSE) stream
         Event types:
@@ -104,6 +106,7 @@ def create_app():
         """
         try:
             data = request.get_json()
+            print(f"\n[DEBUG] Received chat request: {data}", flush=True)
 
             if not data or 'message' not in data:
                 return jsonify({
@@ -113,10 +116,14 @@ def create_app():
 
             user_message = data['message']
             history = data.get('history', None)
-            owner = data.get('owner', config.DEFAULT_USER) # Get owner from request, default to config.DEFAULT_USER
+            owner = get_current_user() # Always use trusted user from server
+            print(f"[DEBUG] Using owner: {owner}", flush=True)
 
             # Get or create KMAgent instance for the specific owner
             km_agent_instance = get_or_create_km_agent(owner)
+            
+            # Reload instructions to ensure we have the latest ones
+            km_agent_instance.reload_instructions()
 
             def generate_stream():
                 """Generate SSE stream from agent"""
@@ -152,8 +159,7 @@ def create_app():
         """
         Get list of documents accessible by user
 
-        Query params:
-        - owner: username (default: "hu")
+        Note: User identification is handled server-side via get_current_user()
 
         Response:
         {
@@ -161,7 +167,7 @@ def create_app():
             "documents": [
                 {
                     "filename": "doc.pdf",
-                    "owner": "hu",
+                    "owner": "huxiaoxiao",
                     "is_public": 0,
                     "file_size": 12345,
                     "created_at": "2025-01-01T12:00:00",
@@ -171,7 +177,7 @@ def create_app():
         }
         """
         try:
-            owner = request.args.get('owner', config.DEFAULT_USER)
+            owner = get_current_user()
 
             # Get document list from file_repository
             files = file_repository.get_owner_file_list(
@@ -214,8 +220,9 @@ def create_app():
 
         Form data:
         - file: PDF file
-        - owner: username (default: "hu")
         - is_public: 0 or 1 (default: 0)
+
+        Note: User identification is handled server-side via get_current_user()
 
         Response: Server-Sent Events (SSE) stream with progress updates
 
@@ -247,7 +254,7 @@ def create_app():
             }), 400
 
         # Get parameters
-        owner = request.form.get('owner', config.DEFAULT_USER)
+        owner = get_current_user()
         is_public = int(request.form.get('is_public', 0))
         filename = file.filename
 
@@ -378,10 +385,9 @@ def create_app():
     @app.route('/api/documents/<filename>', methods=['DELETE'])
     def delete_document(filename):
         """
-        Delete a document by filename and owner
+        Delete a document by filename
 
-        Query params:
-        - owner: username (default: "hu")
+        Note: User identification is handled server-side via get_current_user()
 
         Response:
         {
@@ -390,17 +396,28 @@ def create_app():
         }
         """
         try:
-            owner = request.args.get('owner', config.DEFAULT_USER)
+            owner = get_current_user()
+            
+            # Debug logging
+            print(f"\n[DEBUG] Delete document request:", flush=True)
+            print(f"  - Filename (raw): {repr(filename)}", flush=True)
+            print(f"  - Filename (str): {filename}", flush=True)
+            print(f"  - Owner: {owner}", flush=True)
+            print(f"  - Filename type: {type(filename)}", flush=True)
+            print(f"  - Filename bytes: {filename.encode('utf-8')}", flush=True)
 
             # 1. Delete from vector database (Qdrant)
-            vectorizer.delete_document(filename, owner, verbose=False)
+            print(f"[DEBUG] Deleting from Qdrant...", flush=True)
+            vectorizer.delete_document(filename, owner, verbose=True)
 
             # 2. Delete file and metadata (MinIO + MySQL)
-            file_repository.delete_file(
+            print(f"[DEBUG] Deleting from MinIO and MySQL...", flush=True)
+            result = file_repository.delete_file(
                 owner=owner,
                 filename=filename,
                 bucket='kms'
             )
+            print(f"[DEBUG] Delete result: {result}", flush=True)
 
             return jsonify({
                 "success": True,
@@ -410,6 +427,9 @@ def create_app():
             })
 
         except Exception as e:
+            print(f"[DEBUG] Delete error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             return jsonify({
                 "success": False,
                 "error": str(e)
@@ -422,8 +442,7 @@ def create_app():
         """
         Update document visibility (public/private)
 
-        Query params:
-        - owner: username (default: "hu")
+        Note: User identification is handled server-side via get_current_user()
 
         Request body:
         {
@@ -434,7 +453,7 @@ def create_app():
         {
             "success": true,
             "filename": "doc.pdf",
-            "owner": "hu",
+            "owner": "huxiaoxiao",
             "is_public": 1
         }
         """
@@ -455,7 +474,7 @@ def create_app():
                     "error": "'is_public' must be 0 or 1"
                 }), 400
 
-            owner = request.args.get('owner', config.DEFAULT_USER)
+            owner = get_current_user()
 
             # Update visibility using file_repository
             success = file_repository.set_file_public(
@@ -491,14 +510,13 @@ def create_app():
         """
         Get PDF file content for viewing
 
-        Query params:
-        - owner: username (default: "hu")
+        Note: User identification is handled server-side via get_current_user()
 
         Returns:
             PDF file content or 404 if not found
         """
         try:
-            owner = request.args.get('owner', config.DEFAULT_USER)
+            owner = get_current_user()
 
             # Get file from MinIO
             content = file_repository.get_file(
@@ -567,7 +585,7 @@ def create_app():
             }), 400
 
         # Get parameters
-        username = request.form.get('username', 'system')
+        username = get_current_user()
         prompt = request.form.get('prompt', None)
 
         try:
@@ -641,12 +659,14 @@ def create_app():
             from instruction_repository import create_instruction
             
             data = request.json
-            owner = data.get('owner')
+            owner = get_current_user()
+            print(f"[DEBUG] create_user_instruction: Using owner {owner}", flush=True)
+
             content = data.get('content')
             priority = data.get('priority', 0)
             
-            if not owner:
-                return jsonify({"success": False, "error": "owner参数不能为空"}), 400
+            # if not owner:
+            #     return jsonify({"success": False, "error": "owner参数不能为空"}), 400
             
             if not content:
                 return jsonify({"success": False, "error": "content参数不能为空"}), 400
@@ -679,11 +699,15 @@ def create_app():
         try:
             from instruction_repository import get_all_instructions
             
-            owner = request.args.get('owner')
+            owner = get_current_user()
+            print(f"[DEBUG] get_user_instructions: Using owner {owner}", flush=True)
+
             include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
             
-            if not owner:
-                return jsonify({"success": False, "error": "owner参数不能为空"}), 400
+            print(f"[DEBUG] Getting instructions for owner: {owner}", flush=True)
+            
+            # if not owner:
+            #     return jsonify({"success": False, "error": "owner参数不能为空"}), 400
             
             instructions = get_all_instructions(owner, include_inactive)
             return jsonify({
@@ -719,10 +743,10 @@ def create_app():
         try:
             from instruction_repository import get_instruction_by_id
             
-            owner = request.args.get('owner')
+            owner = get_current_user()
             
-            if not owner:
-                return jsonify({"success": False, "error": "owner参数不能为空"}), 400
+            # if not owner:
+            #     return jsonify({"success": False, "error": "owner参数不能为空"}), 400
             
             instruction = get_instruction_by_id(instruction_id, owner)
             return jsonify({
@@ -759,10 +783,10 @@ def create_app():
             from instruction_repository import update_instruction
             
             data = request.json
-            owner = data.get('owner')
+            owner = get_current_user()
             
-            if not owner:
-                return jsonify({"success": False, "error": "owner参数不能为空"}), 400
+            # if not owner:
+            #     return jsonify({"success": False, "error": "owner参数不能为空"}), 400
             
             content = data.get('content')
             is_active = data.get('is_active')
@@ -803,10 +827,10 @@ def create_app():
             from instruction_repository import delete_instruction
             
             data = request.json
-            owner = data.get('owner')
+            owner = get_current_user()
             
-            if not owner:
-                return jsonify({"success": False, "error": "owner参数不能为空"}), 400
+            # if not owner:
+            #     return jsonify({"success": False, "error": "owner参数不能为空"}), 400
             
             result = delete_instruction(instruction_id, owner)
             return jsonify(result)

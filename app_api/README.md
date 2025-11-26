@@ -82,19 +82,18 @@ curl -X POST http://localhost:5000/api/chat \
 
 **功能**: 获取用户有权访问的文档列表（用户的文档 + 公开文档）
 
-**Query Parameters**:
-- `owner` (可选): 用户名，默认 "hu"
+**注意**: 用户身份由服务器端通过 `get_current_user()` 自动获取
 
 **Response**:
 ```json
 {
     "success": true,
-    "owner": "hu",
+    "owner": "huxiaoxiao",
     "count": 3,
     "documents": [
         {
             "filename": "document.pdf",
-            "owner": "hu",
+            "owner": "huxiaoxiao",
             "is_public": 0,
             "file_size": 123456,
             "created_at": "2025-01-01T12:00:00",
@@ -106,11 +105,8 @@ curl -X POST http://localhost:5000/api/chat \
 
 **示例**:
 ```bash
-# 获取默认用户的文档列表
+# 获取当前用户的文档列表
 curl http://localhost:5000/api/documents
-
-# 获取指定用户的文档列表
-curl http://localhost:5000/api/documents?owner=user123
 ```
 
 ---
@@ -125,8 +121,9 @@ curl http://localhost:5000/api/documents?owner=user123
 
 **Form Data**:
 - `file`: PDF 文件（必需）
-- `owner`: 用户名（可选，默认 "hu"）
 - `is_public`: 0=私有，1=公开（可选，默认 0）
+
+**注意**: 用户身份由服务器端通过 `get_current_user()` 自动获取
 
 **Response**: Server-Sent Events (SSE) 流
 
@@ -143,13 +140,11 @@ data: {"stage": "completed", "progress_percent": 100, "data": {...}}
 # 上传私有文档
 curl -X POST http://localhost:5000/api/upload \
   -F "file=@document.pdf" \
-  -F "owner=hu" \
   -F "is_public=0"
 
 # 上传公开文档
 curl -X POST http://localhost:5000/api/upload \
   -F "file=@document.pdf" \
-  -F "owner=hu" \
   -F "is_public=1"
 ```
 
@@ -157,7 +152,6 @@ curl -X POST http://localhost:5000/api/upload \
 ```javascript
 const formData = new FormData();
 formData.append('file', fileInput.files[0]);
-formData.append('owner', 'hu');
 formData.append('is_public', '0');
 
 fetch('http://localhost:5000/api/upload', {
@@ -197,26 +191,22 @@ fetch('http://localhost:5000/api/upload', {
 
 **功能**: 删除指定文档
 
-**Query Parameters**:
-- `owner` (可选): 用户名，默认 "hu"
+**注意**: 用户身份由服务器端通过 `get_current_user()` 自动获取
 
 **Response**:
 ```json
 {
     "success": true,
     "filename": "document.pdf",
-    "owner": "hu",
+    "owner": "huxiaoxiao",
     "message": "Document deleted successfully"
 }
 ```
 
 **示例**:
 ```bash
-# 删除默认用户的文档
+# 删除文档
 curl -X DELETE http://localhost:5000/api/documents/document.pdf
-
-# 删除指定用户的文档
-curl -X DELETE "http://localhost:5000/api/documents/document.pdf?owner=user123"
 ```
 
 ---
@@ -227,8 +217,7 @@ curl -X DELETE "http://localhost:5000/api/documents/document.pdf?owner=user123"
 
 **功能**: 修改文档为公开/私有
 
-**Query Parameters**:
-- `owner` (可选): 用户名，默认 "hu"
+**注意**: 用户身份由服务器端通过 `get_current_user()` 自动获取
 
 **Request Body**:
 ```json
@@ -242,7 +231,7 @@ curl -X DELETE "http://localhost:5000/api/documents/document.pdf?owner=user123"
 {
     "success": true,
     "filename": "document.pdf",
-    "owner": "hu",
+    "owner": "huxiaoxiao",
     "is_public": 1,
     "message": "Visibility updated successfully"
 }
@@ -256,7 +245,7 @@ curl -X PUT http://localhost:5000/api/documents/document.pdf/visibility \
   -d '{"is_public": 1}'
 
 # 设置为私有
-curl -X PUT "http://localhost:5000/api/documents/document.pdf/visibility?owner=user123" \
+curl -X PUT http://localhost:5000/api/documents/document.pdf/visibility \
   -H "Content-Type: application/json" \
   -d '{"is_public": 0}'
 ```
@@ -269,8 +258,7 @@ curl -X PUT "http://localhost:5000/api/documents/document.pdf/visibility?owner=u
 
 **功能**: 从 MinIO 获取 PDF 文件内容用于查看
 
-**Query Parameters**:
-- `owner` (可选): 用户名，默认 "hu"
+**注意**: 用户身份由服务器端通过 `get_current_user()` 自动获取
 
 **Response**: PDF 文件二进制内容
 
@@ -278,9 +266,6 @@ curl -X PUT "http://localhost:5000/api/documents/document.pdf/visibility?owner=u
 ```bash
 # 获取文档内容
 curl http://localhost:5000/api/documents/document.pdf/content -o document.pdf
-
-# 获取指定用户的文档
-curl "http://localhost:5000/api/documents/document.pdf/content?owner=user123" -o document.pdf
 ```
 
 ---

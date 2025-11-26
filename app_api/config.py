@@ -3,7 +3,7 @@ Configuration for App API
 """
 
 # Default User
-DEFAULT_USER = "huxiaoxiao"
+
 
 # Upload Configuration
 ALLOWED_EXTENSIONS = {'pdf'}

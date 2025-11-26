@@ -5,12 +5,11 @@ import useStore from '../store/useStore'
 
 function ChatMessage({ message }) {
   const openPdfViewer = useStore(state => state.openPdfViewer)
-  const owner = useStore(state => state.owner)
 
   const isUser = message.role === 'user'
 
   const handleDocumentClick = (filename, pageNumber) => {
-    openPdfViewer({ filename, owner, pageNumber })
+    openPdfViewer({ filename, pageNumber })
   }
 
   // 自定义渲染组件
@@ -62,6 +61,27 @@ function ChatMessage({ message }) {
     p: ({ children }) => <p className="my-1.5">{children}</p>,
     // 粗体
     strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+    // 表格样式
+    table: ({ children }) => (
+      <div className="overflow-x-auto my-4">
+        <table className="min-w-full border-collapse border border-gray-300">
+          {children}
+        </table>
+      </div>
+    ),
+    thead: ({ children }) => <thead className="bg-gray-100">{children}</thead>,
+    tbody: ({ children }) => <tbody>{children}</tbody>,
+    tr: ({ children }) => <tr className="border-b border-gray-300">{children}</tr>,
+    th: ({ children }) => (
+      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">
+        {children}
+      </th>
+    ),
+    td: ({ children }) => (
+      <td className="border border-gray-300 px-4 py-2">
+        {children}
+      </td>
+    ),
   }
 
   return (

@@ -89,21 +89,220 @@ class KsUserInfoService:
         except requests.RequestException as e:
             raise KsServiceError(f"HR API请求异常: {e}")
 
-    def get_employee_data(self, email_prefix: str) -> Optional[Dict[str, Any]]:
+
+    def get_subordinates(self, email_prefix: str) -> Dict[str, Any]:
         """
-        获取员工信息数据部分（便捷方法）
+        根据邮箱前缀获取下属列表
 
         Args:
-            email_prefix: 员工邮箱前缀
+            email_prefix: 员工邮箱前缀（如 huxiaoxiao）
 
         Returns:
-            dict: 员工信息数据，如果失败返回None
+            dict: 包含下属信息的字典，格式如下：
+                {
+                    "success": bool,
+                    "data": [
+                        {
+                            "userId": str,
+                            "userName": str,
+                            "userNo": str,
+                            "deptName": str,
+                            ...
+                        },
+                        ...
+                    ]
+                }
+
+        Raises:
+            KsServiceError: 当请求失败或返回错误时抛出
         """
+        # 使用 /api/hr/subordinates/{email_prefix} 端点
+        url = f"{self.base_url.replace('/employee', '/subordinates')}/{email_prefix}"
+
         try:
-            result = self.get_employee_info(email_prefix)
-            return result.get('data')
-        except KsServiceError:
-            return None
+            response = requests.get(url, headers=self.headers, timeout=10)
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    return result
+                else:
+                    raise KsServiceError(
+                        f"HR API返回失败: {result}"
+                    )
+            else:
+                raise KsServiceError(
+                    f"HR API请求失败: {response.status_code} - {response.text}"
+                )
+        except requests.RequestException as e:
+            raise KsServiceError(f"HR API请求异常: {e}")
+
+    def get_attendance(self, email_prefix: str) -> Dict[str, Any]:
+        """
+        根据邮箱前缀获取考勤记录
+
+        Args:
+            email_prefix: 员工邮箱前缀（如 huxiaoxiao）
+
+        Returns:
+            dict: 包含考勤记录的字典，格式如下：
+                {
+                    "success": bool,
+                    "data": [
+                        {
+                            "date": str,
+                            "status": str,
+                            "checkIn": str,
+                            "checkOut": str,
+                            ...
+                        },
+                        ...
+                    ]
+                }
+
+        Raises:
+            KsServiceError: 当请求失败或返回错误时抛出
+        """
+        # 使用 /api/hr/attendance/{email_prefix} 端点
+        url = f"{self.base_url.replace('/employee', '/attendance')}/{email_prefix}"
+
+        try:
+            response = requests.get(url, headers=self.headers, timeout=10)
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    return result
+                else:
+                    raise KsServiceError(
+                        f"HR API返回失败: {result}"
+                    )
+            else:
+                raise KsServiceError(
+                    f"HR API请求失败: {response.status_code} - {response.text}"
+                )
+        except requests.RequestException as e:
+            raise KsServiceError(f"HR API请求异常: {e}")
+
+    def get_subordinate_employee_info(self, target_email_prefix: str, current_user_email_prefix: Optional[str] = None) -> Dict[str, Any]:
+        """
+        获取下属的员工信息（带权限验证）
+
+        Args:
+            target_email_prefix: 目标员工的邮箱前缀
+            current_user_email_prefix: 当前用户的邮箱前缀，如果为None则使用get_current_user()获取
+
+        Returns:
+            dict: 包含员工信息的字典，格式如下：
+                {
+                    "success": bool,
+                    "data": {...},
+                    "message": str  # 可选，仅在无权限时返回
+                }
+
+        Raises:
+            KsServiceError: 当请求失败或返回错误时抛出
+        """
+        # 获取当前用户ID
+        if current_user_email_prefix is None:
+            current_user_email_prefix = get_current_user()
+
+        logger.info(f"当前用户: {current_user_email_prefix}, 查询目标员工信息: {target_email_prefix}")
+
+        try:
+            # 1. 获取当前用户的下属列表
+            subordinates_result = self.get_subordinates(current_user_email_prefix)
+
+            if not subordinates_result.get('success'):
+                raise KsServiceError("无法获取下属列表")
+
+            subordinates_data = subordinates_result.get('data', [])
+
+            # 2. 检查目标用户是否在下属列表中
+            target_user_ids = [sub.get('userId') for sub in subordinates_data]
+
+            logger.info(f"下属列表: {target_user_ids}")
+
+            # 判断目标用户是否在下属中
+            is_subordinate = target_email_prefix in target_user_ids
+
+            if not is_subordinate:
+                # 无权限访问
+                logger.warning(f"用户 {current_user_email_prefix} 无权访问 {target_email_prefix} 的员工信息")
+                return {
+                    "success": False,
+                    "message": f"无权限访问用户 {target_email_prefix} 的员工信息"
+                }
+
+            # 3. 有权限，查询员工信息
+            logger.info(f"用户 {current_user_email_prefix} 有权访问 {target_email_prefix} 的员工信息")
+            employee_info_result = self.get_employee_info(target_email_prefix)
+
+            return employee_info_result
+
+        except KsServiceError as e:
+            logger.error(f"获取下属员工信息失败: {e}")
+            raise
+
+    def get_subordinate_attendance(self, target_email_prefix: str, current_user_email_prefix: Optional[str] = None) -> Dict[str, Any]:
+        """
+        获取下属的考勤记录（带权限验证）
+
+        Args:
+            target_email_prefix: 目标员工的邮箱前缀
+            current_user_email_prefix: 当前用户的邮箱前缀，如果为None则使用get_current_user()获取
+
+        Returns:
+            dict: 包含考勤记录的字典，格式如下：
+                {
+                    "success": bool,
+                    "data": [...],
+                    "message": str  # 可选，仅在无权限时返回
+                }
+
+        Raises:
+            KsServiceError: 当请求失败或返回错误时抛出
+        """
+        # 获取当前用户ID
+        if current_user_email_prefix is None:
+            current_user_email_prefix = get_current_user()
+
+        logger.info(f"当前用户: {current_user_email_prefix}, 查询目标: {target_email_prefix}")
+
+        try:
+            # 1. 获取当前用户的下属列表
+            subordinates_result = self.get_subordinates(current_user_email_prefix)
+
+            if not subordinates_result.get('success'):
+                raise KsServiceError("无法获取下属列表")
+
+            subordinates_data = subordinates_result.get('data', [])
+
+            # 2. 检查目标用户是否在下属列表中
+            target_user_ids = [sub.get('userId') for sub in subordinates_data]
+
+            logger.info(f"下属列表: {target_user_ids}")
+
+            # 判断目标用户是否在下属中
+            is_subordinate = target_email_prefix in target_user_ids
+
+            if not is_subordinate:
+                # 无权限访问
+                logger.warning(f"用户 {current_user_email_prefix} 无权访问 {target_email_prefix} 的考勤记录")
+                return {
+                    "success": False,
+                    "message": f"无权限访问用户 {target_email_prefix} 的考勤记录"
+                }
+
+            # 3. 有权限，查询考勤记录
+            logger.info(f"用户 {current_user_email_prefix} 有权访问 {target_email_prefix} 的考勤记录")
+            attendance_result = self.get_attendance(target_email_prefix)
+
+            return attendance_result
+
+        except KsServiceError as e:
+            logger.error(f"获取下属考勤记录失败: {e}")
+            raise
 
 
 def ks_user_info(**kwargs) -> KsUserInfoService:
@@ -134,3 +333,14 @@ def ks_user_info(**kwargs) -> KsUserInfoService:
     set_cached_instance(instance_key, instance)
     logger.info(f"User info service initialized with URL: {config['base_url']}")
     return instance
+
+
+def get_current_user() -> str:
+    """
+    获取当前用户
+    
+    Returns:
+        str: 当前用户名
+    """
+    # 目前返回默认用户，未来可扩展为从请求头或Token中获取
+    return "huxiaoxiao"

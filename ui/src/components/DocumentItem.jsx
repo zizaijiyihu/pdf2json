@@ -3,18 +3,16 @@ import useStore from '../store/useStore'
 import { deleteDocument, updateDocumentVisibility as updateDocVisibilityAPI } from '../services/api'
 
 function DocumentItem({ document }) {
-  const owner = useStore(state => state.owner)
   const removeDocument = useStore(state => state.removeDocument)
   const updateDocumentVisibility = useStore(state => state.updateDocumentVisibility)
   const openPdfViewer = useStore(state => state.openPdfViewer)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
-  const isOwner = document.owner === owner
   const isPublic = document.is_public === 1
 
   const handleDelete = async () => {
     try {
-      await deleteDocument(document.filename, document.owner)
+      await deleteDocument(document.filename)
       removeDocument(document.filename, document.owner)
       setShowDeleteModal(false)
     } catch (error) {
@@ -27,7 +25,7 @@ function DocumentItem({ document }) {
     e.stopPropagation()
     const newIsPublic = isPublic ? 0 : 1
     try {
-      await updateDocVisibilityAPI(document.filename, document.owner, newIsPublic)
+      await updateDocVisibilityAPI(document.filename, newIsPublic)
       updateDocumentVisibility(document.filename, document.owner, newIsPublic)
     } catch (error) {
       console.error('Failed to update visibility:', error)
@@ -60,30 +58,28 @@ function DocumentItem({ document }) {
               {document.page_count && ` · ${document.page_count}页`}
             </p>
           </div>
-          {/* 按钮组 - 只有所有者才能看到 */}
-          {isOwner && (
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {/* 公开/私有切换按钮 */}
-              <button
-                onClick={handleToggleVisibility}
-                className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 rounded-full transition-all"
-                title={isPublic ? '设为私有' : '设为公开'}
-              >
-                <i className={`fa ${isPublic ? 'fa-lock' : 'fa-globe'} text-sm`} aria-hidden="true"></i>
-              </button>
-              {/* 删除按钮 */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowDeleteModal(true)
-                }}
-                className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
-                title="删除文档"
-              >
-                <i className="fa fa-trash-o text-sm" aria-hidden="true"></i>
-              </button>
-            </div>
-          )}
+          {/* 按钮组 - 总是显示，后端会验证权限 */}
+          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* 公开/私有切换按钮 */}
+            <button
+              onClick={handleToggleVisibility}
+              className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 rounded-full transition-all"
+              title={isPublic ? '设为私有' : '设为公开'}
+            >
+              <i className={`fa ${isPublic ? 'fa-lock' : 'fa-globe'} text-sm`} aria-hidden="true"></i>
+            </button>
+            {/* 删除按钮 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowDeleteModal(true)
+              }}
+              className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+              title="删除文档"
+            >
+              <i className="fa fa-trash-o text-sm" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
       </div>
 

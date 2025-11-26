@@ -21,9 +21,9 @@ function PdfViewer() {
   // 使用useMemo稳定pdfUrl，避免重复渲染导致Document组件重新加载
   const pdfUrl = useMemo(() => {
     if (!currentPdf) return null
-    const url = `/api/documents/${encodeURIComponent(currentPdf.filename)}/content?owner=${encodeURIComponent(currentPdf.owner)}`
+    const url = `/api/documents/${encodeURIComponent(currentPdf.filename)}/content`
     return url
-  }, [currentPdf?.filename, currentPdf?.owner])
+  }, [currentPdf?.filename])
 
   // 使用useMemo缓存file对象，避免不必要的重新加载
   const fileConfig = useMemo(() => ({
@@ -95,9 +95,8 @@ function PdfViewer() {
 
   return (
     <div
-      className={`${
-        isPdfViewerOpen ? 'w-[500px] border-l border-gray-200' : 'w-0'
-      } overflow-hidden transition-all duration-300 bg-white h-screen`}
+      className={`${isPdfViewerOpen ? 'w-[500px] border-l border-gray-200' : 'w-0'
+        } overflow-hidden transition-all duration-300 bg-white h-screen`}
     >
       <div className="w-[500px] h-full flex flex-col bg-white">
         {/* 头部工具栏 */}

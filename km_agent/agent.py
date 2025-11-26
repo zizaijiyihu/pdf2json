@@ -13,8 +13,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pdf_vectorizer import PDFVectorizer
 
 # Import ks_infrastructure services
-from ks_infrastructure import ks_openai
+from ks_infrastructure import ks_openai, ks_user_info
 from ks_infrastructure.configs.default import OPENAI_CONFIG
+from ks_infrastructure import get_current_user
+
+# Import agent tools
+from km_agent.tools import AgentTools
 
 
 class KMAgent:
@@ -38,9 +42,13 @@ class KMAgent:
 5. **回答格式要求**：
    - 使用 Markdown 格式组织回答，严禁使用HTML标签
    - 使用标题、列表、粗体等格式使内容更清晰
-   - 在回答的最后，必须添加"引用文档"部分
-   - **重要：引用文档必须使用Markdown链接语法，不能使用HTML <a>标签**
-   - **引用格式（请严格遵守，直接使用此格式）**：
+   
+6. **引用文档规则（极其重要，必须严格遵守）**：
+   - **只有在search_knowledge 或 get_pages 工具中获得了目标知识，才能添加"引用文档"部分**
+   - **如果没有匹配的答案，绝对不要显示"引用文档"部分**
+   - **引用的文档名和页码必须完全来自工具返回的结果，禁止自己编造或猜测**
+   - **引用文档必须使用Markdown链接语法，不能使用HTML <a>标签**
+   - **引用格式（仅在有工具结果时使用）**：
 
      **引用文档：**
      - 📄 [居住证办理.pdf:2](http://pdf/居住证办理.pdf:2)
@@ -55,16 +63,22 @@ class KMAgent:
        - `[居住证办理.pdf:2]()` ✗ 链接地址为空
        - `<a href="">居住证办理.pdf:2</a>` ✗ 禁止使用HTML
    - **关键**：链接地址必须是 `http://pdf/文档名.pdf:页码` 格式！
+   - **再次强调**：没有调用工具或工具无结果时，不要显示任何引用！
 
 你有以下工具可以使用：
 - search_knowledge: 搜索知识库，返回相关的知识切片
 - get_pages: 根据文件名和页码获取完整的知识内容
+- get_subordinate_attendance: 获取下属的考勤记录（需要权限验证）
+- get_manager_style: 获取管理者的管理风格类型
+- get_current_time: 获取当前时间
+- get_subordinates: 获取指定用户的下属列表（不指定则获取当前用户的下属）
+- get_subordinate_employee_info: 获取下属的员工信息（需要权限验证）
 """
 
     def __init__(
         self,
         verbose: bool = False,
-        owner: str = "default"
+        owner: str = None
     ):
         """
         Initialize KM Agent
@@ -78,7 +92,7 @@ class KMAgent:
             from ks_infrastructure services. No need to pass any parameters.
         """
         self.verbose = verbose
-        self.owner = owner
+        self.owner = owner if owner else get_current_user()
 
         # LLM client (using ks_infrastructure)
         self.llm_client = ks_openai()
@@ -87,71 +101,25 @@ class KMAgent:
         # Vectorizer for knowledge base operations (using ks_infrastructure)
         # collection_name, vector_size are defaults in PDFVectorizer
         self.vectorizer = PDFVectorizer()
-        
+
+        # User info service for HR operations
+        self.user_info_service = ks_user_info()
+
+        # Initialize agent tools
+        self.agent_tools = AgentTools(
+            vectorizer=self.vectorizer,
+            user_info_service=self.user_info_service,
+            verbose=self.verbose
+        )
+
+        # Get tool definitions from agent tools
+        self.tools = self.agent_tools.get_tool_definitions()
+
         # Load user custom instructions
         self.custom_instructions = self._load_instructions()
-        
+
         # Build effective system prompt with custom instructions
         self.effective_system_prompt = self._build_system_prompt()
-
-        # Tool definitions for function calling
-        self.tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "search_knowledge",
-                    "description": "搜索知识库，返回与查询相关的知识切片。使用语义搜索找到最相关的文档页面。",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "搜索查询内容"
-                            },
-                            "limit": {
-                                "type": "integer",
-                                "description": "返回结果数量，默认5",
-                                "default": 5
-                            },
-                            "mode": {
-                                "type": "string",
-                                "enum": ["content"],
-                                "description": "搜索模式：只使用content(内容)召回",
-                                "default": "content"
-                            }
-                        },
-                        "required": ["query"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_pages",
-                    "description": "根据文件名和页码获取完整的知识内容。当需要查看完整内容或后续页面时使用。",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "filename": {
-                                "type": "string",
-                                "description": "文档文件名"
-                            },
-                            "page_numbers": {
-                                "type": "array",
-                                "items": {"type": "integer"},
-                                "description": "要获取的页码列表，例如 [1, 2, 3]"
-                            },
-                            "fields": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "要返回的字段列表，可选值：filename, page_number, content, owner。默认返回 filename, page_number, content。"
-                            }
-                        },
-                        "required": ["filename", "page_numbers"]
-                    }
-                }
-            }
-        ]
 
     def _load_instructions(self) -> list:
         """
@@ -204,79 +172,6 @@ class KMAgent:
         if self.verbose:
             print(f"Reloaded {len(self.custom_instructions)} custom instructions")
 
-    def _search_knowledge(self, query: str, limit: int = 5, mode: str = "content") -> Dict:
-        """
-        Search knowledge base
-
-        Args:
-            query: Search query
-            limit: Number of results
-            mode: Search mode (dual/summary/content)
-
-        Returns:
-            Search results
-        """
-        if self.verbose:
-            print(f"\n[Tool] search_knowledge: query='{query}', limit={limit}, mode={mode}")
-
-        results = self.vectorizer.search(query, limit=limit, mode=mode, verbose=False)
-
-        # Format results for LLM - only return content, no summary
-        formatted_results = []
-
-        if "content_results" in results:
-            for result in results["content_results"]:
-                formatted_results.append({
-                    "filename": result["filename"],
-                    "page_number": result["page_number"],
-                    "score": result["score"],
-                    "content": result["content"]  # Return full content, not preview
-                })
-
-        if self.verbose:
-            print(f"[Tool] Found {len(formatted_results)} results")
-
-        return {
-            "success": True,
-            "total_results": len(formatted_results),
-            "results": formatted_results
-        }
-
-    def _get_pages(self, filename: str, page_numbers: List[int], fields: Optional[List[str]] = None) -> Dict:
-        """
-        Get specific pages from knowledge base
-
-        Args:
-            filename: Document filename
-            page_numbers: List of page numbers to retrieve
-            fields: Optional list of fields to return (default: filename, page_number, content)
-
-        Returns:
-            Page data
-        """
-        # Default fields: only content-related fields, no summary
-        if fields is None:
-            fields = ["filename", "page_number", "content"]
-
-        if self.verbose:
-            print(f"\n[Tool] get_pages: filename='{filename}', page_numbers={page_numbers}, fields={fields}")
-
-        pages = self.vectorizer.get_pages(
-            filename=filename,
-            page_numbers=page_numbers,
-            fields=fields,
-            verbose=False
-        )
-
-        if self.verbose:
-            print(f"[Tool] Retrieved {len(pages)} pages")
-
-        return {
-            "success": True,
-            "total_pages": len(pages),
-            "pages": pages
-        }
-
     def _execute_tool(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
         """
         Execute a tool function
@@ -288,19 +183,7 @@ class KMAgent:
         Returns:
             JSON string of tool result
         """
-        try:
-            if tool_name == "search_knowledge":
-                result = self._search_knowledge(**tool_args)
-            elif tool_name == "get_pages":
-                result = self._get_pages(**tool_args)
-            else:
-                result = {"success": False, "error": f"Unknown tool: {tool_name}"}
-
-            return json.dumps(result, ensure_ascii=False)
-
-        except Exception as e:
-            error_result = {"success": False, "error": str(e)}
-            return json.dumps(error_result, ensure_ascii=False)
+        return self.agent_tools.execute_tool(tool_name, tool_args, current_user=self.owner)
 
     def chat(self, user_message: str, history: Optional[List[Dict]] = None) -> Dict:
         """
@@ -319,11 +202,15 @@ class KMAgent:
         if history is None:
             history = []
 
-        # Add system prompt if this is the first message
+        # Always use the latest system prompt (important for dynamic instruction updates)
         if not history:
             messages = [{"role": "system", "content": self.effective_system_prompt}]
         else:
+            # Copy history but update the system prompt to reflect latest instructions
             messages = history.copy()
+            # Replace the first system message with the updated prompt
+            if messages and messages[0]["role"] == "system":
+                messages[0] = {"role": "system", "content": self.effective_system_prompt}
 
         # Add user message
         messages.append({"role": "user", "content": user_message})
@@ -337,6 +224,10 @@ class KMAgent:
 
             if self.verbose:
                 print(f"\n[Iteration {iteration}] Calling LLM...")
+                # Debug: Print full prompt
+                print("-" * 20 + " Full Prompt " + "-" * 20)
+                print(json.dumps(messages, ensure_ascii=False, indent=2))
+                print("-" * 50)
 
             # Call LLM
             response = self.llm_client.chat.completions.create(
@@ -420,11 +311,18 @@ class KMAgent:
         if history is None:
             history = []
 
-        # Add system prompt if this is the first message
+        # Always use the latest system prompt (important for dynamic instruction updates)
         if not history:
             messages = [{"role": "system", "content": self.effective_system_prompt}]
         else:
+            # Copy history but update the system prompt to reflect latest instructions
             messages = history.copy()
+            # Replace the first system message with the updated prompt
+            if messages and messages[0]["role"] == "system":
+                messages[0] = {"role": "system", "content": self.effective_system_prompt}
+                if self.verbose:
+                    print(f"\n[DEBUG] Updated system prompt in history")
+                    print(f"[DEBUG] Custom instructions count: {len(self.custom_instructions)}")
 
         # Add user message
         messages.append({"role": "user", "content": user_message})
@@ -438,6 +336,10 @@ class KMAgent:
 
             if self.verbose:
                 print(f"\n[Iteration {iteration}] Calling LLM with streaming...")
+                # Debug: Print full prompt
+                print("-" * 20 + " Full Prompt " + "-" * 20)
+                print(json.dumps(messages, ensure_ascii=False, indent=2))
+                print("-" * 50)
 
             # Call LLM with streaming
             response = self.llm_client.chat.completions.create(

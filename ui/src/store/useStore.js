@@ -1,9 +1,6 @@
 import { create } from 'zustand'
 
 const useStore = create((set, get) => ({
-  // 用户信息
-  owner: 'hu',
-
   // 聊天相关状态
   messages: [],
   chatHistory: [],
@@ -12,6 +9,10 @@ const useStore = create((set, get) => ({
   // 文档相关状态
   documents: [],
   isDocumentsLoading: false,
+
+  // 指示相关状态
+  instructions: [],
+  isInstructionsLoading: false,
 
   // 上传相关状态
   uploadProgress: {
@@ -26,6 +27,7 @@ const useStore = create((set, get) => ({
 
   // 侧边栏状态
   isKnowledgeSidebarOpen: false,
+  isInstructionSidebarOpen: false,
   isPdfViewerOpen: false,
   currentPdf: null, // { filename, owner, pageNumber }
   pdfOpenedFromKnowledge: false, // 标记PDF是否从知识文档列表打开
@@ -58,6 +60,25 @@ const useStore = create((set, get) => ({
   setDocuments: (documents) => set({ documents }),
 
   setIsDocumentsLoading: (loading) => set({ isDocumentsLoading: loading }),
+
+  // Actions - 指示
+  setInstructions: (instructions) => set({ instructions }),
+
+  setIsInstructionsLoading: (loading) => set({ isInstructionsLoading: loading }),
+
+  addInstruction: (instruction) => set((state) => ({
+    instructions: [instruction, ...state.instructions]
+  })),
+
+  updateInstructionInList: (id, data) => set((state) => ({
+    instructions: state.instructions.map(inst =>
+      inst.id === id ? { ...inst, ...data } : inst
+    )
+  })),
+
+  removeInstruction: (id) => set((state) => ({
+    instructions: state.instructions.filter(inst => inst.id !== id)
+  })),
 
   addDocument: (document) => set((state) => ({
     documents: [document, ...state.documents]
@@ -96,10 +117,18 @@ const useStore = create((set, get) => ({
 
   // Actions - 侧边栏
   toggleKnowledgeSidebar: () => set((state) => ({
-    isKnowledgeSidebarOpen: !state.isKnowledgeSidebarOpen
+    isKnowledgeSidebarOpen: !state.isKnowledgeSidebarOpen,
+    isInstructionSidebarOpen: false // 互斥
   })),
 
   setKnowledgeSidebarOpen: (open) => set({ isKnowledgeSidebarOpen: open }),
+
+  toggleInstructionSidebar: () => set((state) => ({
+    isInstructionSidebarOpen: !state.isInstructionSidebarOpen,
+    isKnowledgeSidebarOpen: false // 互斥
+  })),
+
+  setInstructionSidebarOpen: (open) => set({ isInstructionSidebarOpen: open }),
 
   // Actions - PDF浏览器
   openPdfViewer: (pdfInfo, fromKnowledge = false) => set({
