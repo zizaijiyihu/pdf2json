@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react'
 import useStore from '../store/useStore'
 import { sendChatMessage, analyzeImage } from '../services/api'
 import ChatMessage from './ChatMessage'
+import QuoteDisplay from './QuoteDisplay'
 
 function ChatView() {
   const messages = useStore(state => state.messages)
@@ -22,6 +23,7 @@ function ChatView() {
 
   const messageContainerRef = useRef(null)
   const inputRef = useRef(null)
+  const abortControllerRef = useRef(null)
 
   const hasMessages = messages.length > 0
 
@@ -113,6 +115,15 @@ function ChatView() {
     setUploadedImages(prev => prev.filter(img => img.id !== imageId))
   }
 
+  // 处理停止生成
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      setIsLoading(false)
+    }
+  }
+
   // 处理发送消息
   const handleSendMessage = async () => {
     const text = inputValue.trim()
@@ -159,28 +170,42 @@ function ChatView() {
     // 创建一个空的assistant消息用于流式更新
     addMessage({ role: 'assistant', content: '' })
 
+    // 创建 AbortController
+    abortControllerRef.current = new AbortController()
+
     let streamingContent = ''
 
     try {
-      const response = await sendChatMessage(fullMessage, chatHistory, (chunk) => {
-        if (chunk.type === 'content') {
-          // 流式更新内容
-          streamingContent += chunk.content
-          updateLastMessage(streamingContent)
-        } else if (chunk.type === 'tool_call') {
-          console.log('Tool call:', chunk.data)
-        }
-      })
+      const response = await sendChatMessage(
+        fullMessage,
+        chatHistory,
+        (chunk) => {
+          if (chunk.type === 'content') {
+            // 流式更新内容
+            streamingContent += chunk.content
+            updateLastMessage(streamingContent)
+          } else if (chunk.type === 'tool_call') {
+            console.log('Tool call:', chunk.data)
+          }
+        },
+        abortControllerRef.current.signal
+      )
 
       // 更新历史
       if (response.history) {
         setChatHistory(response.history)
       }
     } catch (error) {
-      console.error('Failed to send message:', error)
-      // 更新最后一条消息为错误信息
-      updateLastMessage('抱歉，发送消息失败，请稍后重试。')
+      if (error.name === 'AbortError') {
+        // 用户主动中断，不显示错误
+        console.log('Generation stopped by user')
+      } else {
+        console.error('Failed to send message:', error)
+        // 更新最后一条消息为错误信息
+        updateLastMessage('抱歉，发送消息失败，请稍后重试。')
+      }
     } finally {
+      abortControllerRef.current = null
       setIsLoading(false)
     }
   }
@@ -229,14 +254,9 @@ function ChatView() {
           : 'flex-1 items-center justify-center'
           } flex flex-col bg-white w-full transition-all duration-1200 ease-out`}
       >
-        {/* 问候语 */}
+        {/* 语录展示 */}
         {!hasMessages && (
-          <div
-            className={`text-2xl text-gray-800 font-medium mb-8 transition-opacity duration-800 ${greetingVisible ? 'opacity-100' : 'opacity-0'
-              }`}
-          >
-            创造知识   共享知识
-          </div>
+          <QuoteDisplay visible={greetingVisible} />
         )}
 
         {/* 输入区 */}
@@ -320,12 +340,12 @@ function ChatView() {
                   <i className="fa fa-book" aria-hidden="true"></i>
                 </button>
                 <button
-                  onClick={handleSendMessage}
-                  disabled={!inputValue.trim() || isLoading}
+                  onClick={isLoading ? handleStopGeneration : handleSendMessage}
+                  disabled={!isLoading && !inputValue.trim()}
                   className="w-8 h-8 flex items-center justify-center text-white bg-primary hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="发送"
+                  title={isLoading ? "停止生成" : "发送"}
                 >
-                  <i className="fa fa-paper-plane-o" aria-hidden="true"></i>
+                  <i className={isLoading ? "fa fa-stop" : "fa fa-paper-plane-o"} aria-hidden="true"></i>
                 </button>
               </div>
             </div>

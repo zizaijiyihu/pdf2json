@@ -4,6 +4,13 @@
 """
 
 import sys
+import os
+
+# 添加项目根目录到 python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(project_root)
+
 from pdf_to_json import PDFToJSONConverter
 
 if len(sys.argv) < 2:

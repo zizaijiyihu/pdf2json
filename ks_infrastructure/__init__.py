@@ -5,6 +5,7 @@ from .services.user_info_service import get_current_user, ks_user_info
 from .services.vision_service import ks_vision
 from .services.minio_service import ks_minio
 from .services.embedding_service import ks_embedding
+from .db_session import db_session, db_transaction
 
 __all__ = [
     'ks_openai', 
@@ -14,5 +15,7 @@ __all__ = [
     'ks_user_info',
     'ks_vision',
     'ks_minio',
-    'ks_embedding'
+    'ks_embedding',
+    'db_session',
+    'db_transaction'
 ]

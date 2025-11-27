@@ -12,7 +12,7 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ks_infrastructure.services.mysql_service import ks_mysql
+from ks_infrastructure import db_session
 from ks_infrastructure.services.minio_service import ks_minio
 from ks_infrastructure.services.exceptions import KsConnectionError
 from botocore.exceptions import ClientError
@@ -31,39 +31,35 @@ def clear_mysql_table():
     print(f"{'='*60}\n")
 
     try:
-        conn = ks_mysql()
-        cursor = conn.cursor()
-
         # 查询记录数
-        cursor.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}")
-        count = cursor.fetchone()[0]
+        with db_session() as cursor:
+            cursor.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}")
+            count = cursor.fetchone()[0]
 
         print(f"找到 {count} 条记录")
 
         if count == 0:
             print("✓ 表已经是空的")
-            cursor.close()
             return
 
         # 确认删除
         confirm = input(f"\n⚠️  确定要删除 {count} 条记录吗？(yes/no): ")
         if confirm.lower() != 'yes':
             print("✗ 操作已取消")
-            cursor.close()
             return
 
         # 清空表
-        cursor.execute(f"TRUNCATE TABLE {TABLE_NAME}")
-        conn.commit()
+        with db_session() as cursor:
+            cursor.execute(f"TRUNCATE TABLE {TABLE_NAME}")
 
         print(f"✓ 成功清空表 '{TABLE_NAME}'")
 
         # 验证清空结果
-        cursor.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}")
-        count_after = cursor.fetchone()[0]
+        with db_session() as cursor:
+            cursor.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}")
+            count_after = cursor.fetchone()[0]
+        
         print(f"✓ 当前记录数: {count_after}")
-
-        cursor.close()
 
     except Exception as e:
         print(f"✗ 清空MySQL表失败: {e}")

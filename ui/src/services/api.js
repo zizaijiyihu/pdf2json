@@ -1,19 +1,21 @@
 const API_BASE_URL = '/api'
 
 /**
- * 发送聊天消息（流式）
+ * 发送聊天消息(流式)
  * @param {string} message - 用户消息
  * @param {Array} history - 聊天历史
  * @param {Function} onChunk - 流式数据回调
+ * @param {AbortSignal} signal - 可选的 AbortSignal 用于取消请求
  * @returns {Promise<Object>} 最终结果
  */
-export async function sendChatMessage(message, history = [], onChunk) {
+export async function sendChatMessage(message, history = [], onChunk, signal = null) {
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message, history })
+    body: JSON.stringify({ message, history }),
+    signal: signal
   })
 
   if (!response.ok) {
@@ -152,6 +154,7 @@ export async function uploadPDF(file, isPublic = 0, onProgress) {
       if (line.startsWith('data: ')) {
         try {
           const data = JSON.parse(line.substring(6))
+          // console.log('[DEBUG] SSE Data:', data)
 
           // 调用进度回调
           if (onProgress) {
@@ -358,6 +361,91 @@ export async function deleteInstruction(id) {
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error || 'Failed to delete instruction')
+  }
+
+  return response.json()
+}
+
+/**
+ * 获取语录列表
+ * @param {number} page - 页码
+ * @param {number} pageSize - 每页数量
+ * @returns {Promise<Object>} 语录列表
+ */
+export async function getQuotes(page = 1, pageSize = 10) {
+  const url = `${API_BASE_URL}/quotes?page=${page}&page_size=${pageSize}`
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to fetch quotes')
+  }
+
+  return response.json()
+}
+
+/**
+ * 创建新语录
+ * @param {string} content - 语录内容
+ * @param {number} isFixed - 是否固定 (0=否, 1=是)
+ * @returns {Promise<Object>} 创建结果
+ */
+export async function createQuote(content, isFixed = 0) {
+  const body = { content, is_fixed: isFixed }
+  const response = await fetch(`${API_BASE_URL}/quotes`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body)
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to create quote')
+  }
+
+  return response.json()
+}
+
+/**
+ * 更新语录
+ * @param {number} id - 语录ID
+ * @param {string} content - 语录内容
+ * @param {number} isFixed - 是否固定 (0=否, 1=是)
+ * @returns {Promise<Object>} 更新结果
+ */
+export async function updateQuote(id, content, isFixed) {
+  const body = { content, is_fixed: isFixed }
+  const response = await fetch(`${API_BASE_URL}/quotes/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body)
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to update quote')
+  }
+
+  return response.json()
+}
+
+/**
+ * 删除语录
+ * @param {number} id - 语录ID
+ * @returns {Promise<Object>} 删除结果
+ */
+export async function deleteQuote(id) {
+  const response = await fetch(`${API_BASE_URL}/quotes/${id}`, {
+    method: 'DELETE'
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to delete quote')
   }
 
   return response.json()
