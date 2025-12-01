@@ -27,9 +27,12 @@ function ReminderAnalysisCard({ reminder, onClose }) {
         abortControllerRef.current = new AbortController()
         let streamingContent = ''
 
+        // 添加系统提示词，要求模型返回简短答案
+        const wrappedMessage = `${reminder.content}\n\n【系统要求】该请求是发送简短消息所需，直接给出最终答案，最言简意赅表明情况即可，不需要过度分析。`
+
         try {
             await sendChatMessage(
-                reminder.content,
+                wrappedMessage,
                 null, // 不传历史
                 (chunk) => {
                     if (chunk.type === 'content') {
@@ -60,10 +63,10 @@ function ReminderAnalysisCard({ reminder, onClose }) {
     }
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden transition-all">
+        <div className="bg-transparent border-none rounded-lg overflow-hidden transition-all">
             {/* 头部 - 标题和操作 */}
             <div
-                className="p-3 bg-gray-50/50 border-b border-gray-100 flex items-start justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+                className="p-3 bg-transparent border-b border-gray-50 flex items-start justify-between cursor-pointer hover:bg-white/30 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex-1 pr-2">

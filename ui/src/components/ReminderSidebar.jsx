@@ -57,7 +57,7 @@ function ReminderSidebar() {
 
     return (
         <div
-            className={`${isOpen ? 'w-80 border-l border-gray-200' : 'w-0'
+            className={`${isOpen ? 'w-80 border-l border-gray-100' : 'w-0'
                 } overflow-hidden transition-all duration-300 bg-white`}
         >
             <div className="w-80 h-[calc(100vh-200px)] my-[100px] p-6 overflow-y-auto scrollbar-thin">
@@ -108,7 +108,7 @@ function ReminderSidebar() {
                     ) : (
                         <button
                             onClick={() => setIsCreating(true)}
-                            className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
+                            className="w-full py-3 border-2 border-dashed border-gray-300/50 rounded-lg text-gray-500 hover:border-primary/50 hover:text-primary transition-colors flex items-center justify-center gap-2"
                         >
                             <i className="fa fa-plus"></i>
                             <span>新建提醒</span>

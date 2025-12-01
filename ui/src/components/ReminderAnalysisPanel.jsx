@@ -38,14 +38,14 @@ function ReminderAnalysisPanel() {
 
     return (
         <div
-            className="fixed left-0 top-1/2 transform -translate-y-1/2 w-80 max-h-[80vh] overflow-y-auto scrollbar-thin bg-white/95 backdrop-blur-sm border-r border-gray-200 shadow-lg p-4 space-y-3 z-20"
+            className="fixed left-0 top-1/2 transform -translate-y-1/2 w-80 max-h-[80vh] overflow-y-auto scrollbar-thin bg-white/30 backdrop-blur-sm p-4 space-y-3 z-20"
             style={{
                 borderTopRightRadius: '16px',
                 borderBottomRightRadius: '16px'
             }}
         >
             {/* 标题 */}
-            <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-50">
                 <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <i className="fa fa-bell-o text-primary"></i>
                     <span>智能提醒</span>
