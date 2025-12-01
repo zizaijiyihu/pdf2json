@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { sendChatMessage } from '../services/api'
 
 function ReminderAnalysisCard({ reminder, onClose }) {
@@ -108,8 +110,64 @@ function ReminderAnalysisCard({ reminder, onClose }) {
 
             {/* 内容区域 */}
             {isExpanded && status === 'done' && content && (
-                <div className="p-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto scrollbar-thin">
-                    {content}
+                <div className="p-3 text-sm text-gray-700 leading-relaxed max-h-60 overflow-y-auto scrollbar-thin">
+                    <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                            // 代码块样式
+                            code: ({ inline, children, ...props }) => {
+                                return inline ? (
+                                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                                        {children}
+                                    </code>
+                                ) : (
+                                    <code className="block bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto my-2" {...props}>
+                                        {children}
+                                    </code>
+                                )
+                            },
+                            // 列表样式
+                            ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
+                            // 标题样式
+                            h1: ({ children }) => <h1 className="text-base font-bold my-2">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-sm font-bold my-2">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-bold my-1.5">{children}</h3>,
+                            // 段落样式
+                            p: ({ children }) => <p className="my-1.5">{children}</p>,
+                            // 粗体
+                            strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                            // 链接样式
+                            a: ({ href, children, ...props }) => (
+                                <a href={href} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer" {...props}>
+                                    {children}
+                                </a>
+                            ),
+                            // 表格样式
+                            table: ({ children }) => (
+                                <div className="overflow-x-auto my-3">
+                                    <table className="min-w-full border-collapse border border-gray-300 text-xs">
+                                        {children}
+                                    </table>
+                                </div>
+                            ),
+                            thead: ({ children }) => <thead className="bg-gray-100">{children}</thead>,
+                            tbody: ({ children }) => <tbody>{children}</tbody>,
+                            tr: ({ children }) => <tr className="border-b border-gray-300">{children}</tr>,
+                            th: ({ children }) => (
+                                <th className="border border-gray-300 px-3 py-1.5 text-left font-semibold">
+                                    {children}
+                                </th>
+                            ),
+                            td: ({ children }) => (
+                                <td className="border border-gray-300 px-3 py-1.5">
+                                    {children}
+                                </td>
+                            ),
+                        }}
+                    >
+                        {content}
+                    </ReactMarkdown>
                 </div>
             )}
 

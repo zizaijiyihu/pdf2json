@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { updateReminder, deleteReminder } from '../services/api'
 import useStore from '../store/useStore'
 
@@ -90,8 +92,43 @@ function ReminderItem({ reminder }) {
                 </div>
             ) : (
                 <>
-                    <div className="text-sm text-gray-800 whitespace-pre-wrap mb-3">
-                        {reminder.content}
+                    <div className="text-sm text-gray-800 mb-3">
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                                // 代码块样式
+                                code: ({ inline, children, ...props }) => {
+                                    return inline ? (
+                                        <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                                            {children}
+                                        </code>
+                                    ) : (
+                                        <code className="block bg-gray-100 p-2 rounded text-sm font-mono overflow-x-auto" {...props}>
+                                            {children}
+                                        </code>
+                                    )
+                                },
+                                // 列表样式
+                                ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
+                                ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
+                                // 标题样式
+                                h1: ({ children }) => <h1 className="text-base font-bold my-2">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-sm font-bold my-2">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-sm font-bold my-1.5">{children}</h3>,
+                                // 段落样式
+                                p: ({ children }) => <p className="my-1.5">{children}</p>,
+                                // 粗体
+                                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                // 链接样式
+                                a: ({ href, children, ...props }) => (
+                                    <a href={href} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer" {...props}>
+                                        {children}
+                                    </a>
+                                ),
+                            }}
+                        >
+                            {reminder.content}
+                        </ReactMarkdown>
                     </div>
                     <div className="flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <span className="text-xs text-gray-400">
