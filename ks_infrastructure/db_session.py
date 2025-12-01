@@ -83,7 +83,7 @@ def db_session(
                 logger.error(f"Failed to rollback transaction: {rollback_error}")
         
         # 重新抛出原始异常
-        if isinstance(e, KsConnectionError):
+        if isinstance(e, (KsConnectionError, ValueError)):
             raise
         else:
             raise KsConnectionError(f"Database operation failed: {e}") from e

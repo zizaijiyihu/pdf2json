@@ -78,7 +78,9 @@ class KMAgent:
     def __init__(
         self,
         verbose: bool = False,
-        owner: str = None
+        owner: str = None,
+        conversation_id: str = None,
+        enable_history: bool = False
     ):
         """
         Initialize KM Agent
@@ -86,6 +88,8 @@ class KMAgent:
         Args:
             verbose: Whether to print debug information
             owner: User identifier for loading custom instructions
+            conversation_id: Conversation ID for history persistence (optional)
+            enable_history: Whether to enable conversation history persistence
 
         Note:
             All configuration (OpenAI, embedding, Qdrant) is automatically loaded
@@ -120,6 +124,22 @@ class KMAgent:
 
         # Build effective system prompt with custom instructions
         self.effective_system_prompt = self._build_system_prompt()
+        
+        # Conversation manager (optional)
+        self.conversation_manager = None
+        if enable_history:
+            from km_agent.conversation_manager import ConversationManager
+            self.conversation_manager = ConversationManager(
+                owner=self.owner,
+                conversation_id=conversation_id,
+                verbose=self.verbose
+            )
+            # If no conversation_id provided, create a new conversation
+            if not conversation_id:
+                self.conversation_manager.start_conversation()
+            
+            if self.verbose:
+                print(f"[ConversationManager] Enabled with conversation_id: {self.conversation_manager.get_conversation_id()}")
 
     def _load_instructions(self) -> list:
         """
@@ -185,116 +205,6 @@ class KMAgent:
         """
         return self.agent_tools.execute_tool(tool_name, tool_args, current_user=self.owner)
 
-    def chat(self, user_message: str, history: Optional[List[Dict]] = None) -> Dict:
-        """
-        Chat with the agent
-
-        Args:
-            user_message: User's message
-            history: Optional conversation history
-
-        Returns:
-            Dictionary containing:
-            - response: Agent's response text
-            - tool_calls: List of tool calls made (if any)
-            - history: Updated conversation history
-        """
-        if history is None:
-            history = []
-
-        # Always use the latest system prompt (important for dynamic instruction updates)
-        if not history:
-            messages = [{"role": "system", "content": self.effective_system_prompt}]
-        else:
-            # Copy history but update the system prompt to reflect latest instructions
-            messages = history.copy()
-            # Replace the first system message with the updated prompt
-            if messages and messages[0]["role"] == "system":
-                messages[0] = {"role": "system", "content": self.effective_system_prompt}
-
-        # Add user message
-        messages.append({"role": "user", "content": user_message})
-
-        tool_calls_made = []
-        max_iterations = 5  # Prevent infinite loops
-        iteration = 0
-
-        while iteration < max_iterations:
-            iteration += 1
-
-            if self.verbose:
-                print(f"\n[Iteration {iteration}] Calling LLM...")
-                # Debug: Print full prompt
-                print("-" * 20 + " Full Prompt " + "-" * 20)
-                print(json.dumps(messages, ensure_ascii=False, indent=2))
-                print("-" * 50)
-
-            # Call LLM
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=messages,
-                tools=self.tools,
-                tool_choice="auto"
-            )
-
-            assistant_message = response.choices[0].message
-
-            # Add assistant message to history
-            messages.append({
-                "role": "assistant",
-                "content": assistant_message.content,
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": tc.type,
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments
-                        }
-                    } for tc in (assistant_message.tool_calls or [])
-                ] if assistant_message.tool_calls else None
-            })
-
-            # If no tool calls, we're done
-            if not assistant_message.tool_calls:
-                if self.verbose:
-                    print(f"[Iteration {iteration}] No tool calls, finishing")
-                break
-
-            # Execute tool calls
-            for tool_call in assistant_message.tool_calls:
-                tool_name = tool_call.function.name
-                tool_args = json.loads(tool_call.function.arguments)
-
-                if self.verbose:
-                    print(f"[Iteration {iteration}] Executing tool: {tool_name}")
-
-                # Execute tool
-                tool_result = self._execute_tool(tool_name, tool_args)
-
-                # Record tool call
-                tool_calls_made.append({
-                    "tool": tool_name,
-                    "arguments": tool_args,
-                    "result": json.loads(tool_result)
-                })
-
-                # Add tool result to messages
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": tool_result
-                })
-
-        # Get final response
-        final_response = messages[-1]["content"] if messages[-1]["role"] == "assistant" else "抱歉，我无法处理您的请求。"
-
-        return {
-            "response": final_response,
-            "tool_calls": tool_calls_made,
-            "history": messages
-        }
-
     def chat_stream(self, user_message: str, history: Optional[List[Dict]] = None):
         """
         Chat with the agent using streaming response
@@ -314,6 +224,9 @@ class KMAgent:
         # Always use the latest system prompt (important for dynamic instruction updates)
         if not history:
             messages = [{"role": "system", "content": self.effective_system_prompt}]
+            # Save system message if conversation manager is enabled
+            if self.conversation_manager:
+                self.conversation_manager.save_system_message(self.effective_system_prompt)
         else:
             # Copy history but update the system prompt to reflect latest instructions
             messages = history.copy()
@@ -326,6 +239,10 @@ class KMAgent:
 
         # Add user message
         messages.append({"role": "user", "content": user_message})
+        
+        # Save user message to database
+        if self.conversation_manager:
+            self.conversation_manager.save_user_message(user_message)
 
         tool_calls_made = []
         max_iterations = 5
@@ -365,7 +282,7 @@ class KMAgent:
                 # Handle content streaming
                 if delta.content:
                     collected_content += delta.content
-                    # Yield content chunk
+                    # Yield content chunk immediately for streaming experience
                     yield {
                         "type": "content",
                         "data": delta.content
@@ -392,20 +309,39 @@ class KMAgent:
                             if tc_chunk.function.arguments:
                                 current_tool_call["function"]["arguments"] += tc_chunk.function.arguments
 
-            # Add assistant message to history
+            # Add assistant message to history (in-memory)
             messages.append({
                 "role": "assistant",
                 "content": collected_content,
                 "tool_calls": collected_tool_calls if collected_tool_calls else None
             })
-
-            # If no tool calls, we're done
+            
+            # Only save assistant message to database if it's the final answer (no tool calls)
             if not collected_tool_calls:
+                if self.conversation_manager:
+                    self.conversation_manager.save_assistant_message(
+                        content=collected_content,
+                        tool_calls=None
+                    )
+                
+                # Get clean history (consistent with DB) for the frontend
+                # Filter out intermediate tool calls and tool results from the returned history
+                clean_history = []
+                for msg in messages:
+                    # Keep user and system messages
+                    if msg['role'] in ['user', 'system']:
+                        clean_history.append(msg)
+                    # Keep assistant messages ONLY if they don't have tool_calls
+                    elif msg['role'] == 'assistant' and not msg.get('tool_calls'):
+                        clean_history.append(msg)
+                    # Skip tool messages (role='tool')
+                
                 yield {
                     "type": "done",
                     "data": {
                         "tool_calls": tool_calls_made,
-                        "history": messages
+                        "history": clean_history,
+                        "conversation_id": self.conversation_manager.get_conversation_id() if self.conversation_manager else None
                     }
                 }
                 break
@@ -418,7 +354,7 @@ class KMAgent:
                 if self.verbose:
                     print(f"[Iteration {iteration}] Executing tool: {tool_name}")
 
-                # Yield tool call notification
+                # Yield tool call notification (optional, frontend logs it but doesn't show in chat bubble)
                 yield {
                     "type": "tool_call",
                     "data": {
@@ -437,16 +373,18 @@ class KMAgent:
                     "result": json.loads(tool_result)
                 })
 
-                # Add tool result to messages
+                # Add tool result to messages (in-memory)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call["id"],
                     "content": tool_result
                 })
+                
+                # Do NOT save tool message to database (as per user requirement)
 
     def run(self):
         """
-        Run interactive chat session
+        Run interactive chat session using streaming
         """
         print("="*80)
         print("金山知识管理 Agent")
@@ -469,14 +407,25 @@ class KMAgent:
 
                 print("\nAgent: ", end="", flush=True)
 
-                result = self.chat(user_input, history)
-                print(result["response"])
+                # Use chat_stream instead of chat
+                tool_calls_made = []
+                final_history = None
 
-                history = result["history"]
+                for chunk in self.chat_stream(user_input, history):
+                    if chunk["type"] == "content":
+                        print(chunk["data"], end="", flush=True)
+                    elif chunk["type"] == "tool_call":
+                        tool_calls_made.append(chunk["data"])
+                    elif chunk["type"] == "done":
+                        final_history = chunk["data"]["history"]
+                        tool_calls_made = chunk["data"]["tool_calls"]
 
-                if self.verbose and result["tool_calls"]:
-                    print(f"\n[Debug] Tool calls: {len(result['tool_calls'])}")
-                    for i, tc in enumerate(result["tool_calls"], 1):
+                print()  # New line after response
+                history = final_history
+
+                if self.verbose and tool_calls_made:
+                    print(f"\n[Debug] Tool calls: {len(tool_calls_made)}")
+                    for i, tc in enumerate(tool_calls_made, 1):
                         print(f"  {i}. {tc['tool']}: {tc['arguments']}")
 
             except KeyboardInterrupt:

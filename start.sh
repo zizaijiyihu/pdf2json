@@ -37,6 +37,52 @@ cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}项目目录: ${PROJECT_ROOT}${NC}\n"
 
+# 清理端口占用
+echo -e "${BLUE}[0/5] 清理端口占用...${NC}"
+
+# 清理 5000 端口 (后端 API)
+API_PORT_PIDS=$(lsof -ti:5000 2>/dev/null || true)
+if [ -n "$API_PORT_PIDS" ]; then
+    echo -e "${BLUE}发现端口 5000 被占用，正在清理...${NC}"
+    echo "$API_PORT_PIDS" | xargs kill -9 2>/dev/null || true
+    sleep 1
+    echo -e "${GREEN}✓ 端口 5000 已清理${NC}"
+else
+    echo -e "${GREEN}✓ 端口 5000 未被占用${NC}"
+fi
+
+# 清理 8080 端口 (前端 UI)
+UI_PORT_PIDS=$(lsof -ti:8080 2>/dev/null || true)
+if [ -n "$UI_PORT_PIDS" ]; then
+    echo -e "${BLUE}发现端口 8080 被占用，正在清理...${NC}"
+    echo "$UI_PORT_PIDS" | xargs kill -9 2>/dev/null || true
+    sleep 1
+    echo -e "${GREEN}✓ 端口 8080 已清理${NC}"
+else
+    echo -e "${GREEN}✓ 端口 8080 未被占用${NC}"
+fi
+
+# 清理旧的 PID 文件记录的进程
+if [ -f "/tmp/km_agent_api.pid" ]; then
+    OLD_API_PID=$(cat /tmp/km_agent_api.pid 2>/dev/null || true)
+    if [ -n "$OLD_API_PID" ] && ps -p "$OLD_API_PID" > /dev/null 2>&1; then
+        echo -e "${BLUE}清理旧的后端进程 (PID: $OLD_API_PID)...${NC}"
+        kill -9 "$OLD_API_PID" 2>/dev/null || true
+    fi
+    rm -f /tmp/km_agent_api.pid
+fi
+
+if [ -f "/tmp/km_agent_ui.pid" ]; then
+    OLD_UI_PID=$(cat /tmp/km_agent_ui.pid 2>/dev/null || true)
+    if [ -n "$OLD_UI_PID" ] && ps -p "$OLD_UI_PID" > /dev/null 2>&1; then
+        echo -e "${BLUE}清理旧的前端进程 (PID: $OLD_UI_PID)...${NC}"
+        kill -9 "$OLD_UI_PID" 2>/dev/null || true
+    fi
+    rm -f /tmp/km_agent_ui.pid
+fi
+
+echo -e "${GREEN}✓ 端口清理完成${NC}\n"
+
 # 激活 Python 虚拟环境
 VENV_PATH="${VENV_PATH:-$HOME/projects/venv}"
 if [ -f "$VENV_PATH/bin/activate" ]; then
@@ -51,7 +97,7 @@ else
 fi
 
 # 1. 检查 Python 依赖
-echo -e "${BLUE}[1/4] 检查 Python 依赖...${NC}"
+echo -e "${BLUE}[1/5] 检查 Python 依赖...${NC}"
 if [ -f "requirements.txt" ]; then
     "$VENV_PATH/bin/pip" install -r requirements.txt
     echo -e "${GREEN}✓ Python 依赖已安装${NC}\n"
@@ -60,7 +106,7 @@ else
 fi
 
 # 2. 检查前端依赖
-echo -e "${BLUE}[2/4] 检查前端依赖...${NC}"
+echo -e "${BLUE}[2/5] 检查前端依赖...${NC}"
 if [ -d "ui" ]; then
     cd ui
     if [ ! -d "node_modules" ]; then
@@ -74,7 +120,7 @@ else
 fi
 
 # 3. 启动后端 API 服务
-echo -e "${BLUE}[3/4] 启动后端 API 服务 (端口 5000)...${NC}"
+echo -e "${BLUE}[3/5] 启动后端 API 服务 (端口 5000)...${NC}"
 python3 -u -m app_api.api 2>&1 | tee /tmp/km_agent_api.log &
 API_PID=$!
 echo -e "${GREEN}✓ 后端服务已启动 (PID: $API_PID)${NC}"

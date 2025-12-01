@@ -99,7 +99,7 @@ function QuoteDisplay({ visible }) {
     const handleAdd = async () => {
         if (!newContent.trim()) return
         try {
-            await createQuote(newContent, newIsFixed)
+            await createQuote(newContent, 0)
             setNewContent('')
             setNewIsFixed(0)
             fetchQuotesList(page)
@@ -132,6 +132,17 @@ function QuoteDisplay({ visible }) {
         }
     }
 
+    const handleToggleFixed = async (quote) => {
+        try {
+            const newStatus = quote.is_fixed === 1 ? 0 : 1
+            await updateQuote(quote.id, quote.content, newStatus)
+            fetchQuotesList(page)
+            fetchDisplayQuote()
+        } catch (error) {
+            console.error('Failed to toggle fixed status:', error)
+        }
+    }
+
     const startEdit = (quote) => {
         setEditingId(quote.id)
         setEditContent(quote.content)
@@ -161,11 +172,10 @@ function QuoteDisplay({ visible }) {
 
                 {/* Quote Component - Centered content */}
                 <div
-                    className={`flex items-center justify-center text-2xl text-gray-800 font-medium transition-all ${
-                        isTransitioning
+                    className={`flex items-center justify-center text-2xl text-gray-800 font-medium transition-all ${isTransitioning
                             ? 'opacity-0 transform scale-95 duration-700'
                             : 'opacity-100 transform scale-100 duration-500'
-                    }`}
+                        }`}
                 >
                     {currentQuote?.content || '创造知识   共享知识'}
                 </div>
@@ -211,15 +221,7 @@ function QuoteDisplay({ visible }) {
                                                     rows="2"
                                                 />
                                                 <div className="flex items-center justify-between">
-                                                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={editIsFixed === 1}
-                                                            onChange={(e) => setEditIsFixed(e.target.checked ? 1 : 0)}
-                                                            className="rounded text-primary focus:ring-primary"
-                                                        />
-                                                        设为固定展示
-                                                    </label>
+
                                                     <div className="flex gap-2">
                                                         <button
                                                             onClick={cancelEdit}
@@ -240,13 +242,16 @@ function QuoteDisplay({ visible }) {
                                             <div className="flex items-start justify-between gap-4">
                                                 <div className="flex-1">
                                                     <div className="text-gray-800">{quote.content}</div>
-                                                    {quote.is_fixed === 1 && (
-                                                        <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">
-                                                            固定展示
-                                                        </span>
-                                                    )}
+
                                                 </div>
-                                                <div className="flex gap-2 opacity-30 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={() => handleDelete(quote.id)}
+                                                        className="text-gray-400 hover:text-red-500 p-1"
+                                                        title="删除"
+                                                    >
+                                                        <i className="fa fa-trash"></i>
+                                                    </button>
                                                     <button
                                                         onClick={() => startEdit(quote)}
                                                         className="text-gray-400 hover:text-primary p-1"
@@ -255,11 +260,11 @@ function QuoteDisplay({ visible }) {
                                                         <i className="fa fa-pencil"></i>
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDelete(quote.id)}
-                                                        className="text-gray-400 hover:text-red-500 p-1"
-                                                        title="删除"
+                                                        onClick={() => handleToggleFixed(quote)}
+                                                        className={`p-1 ${quote.is_fixed === 1 ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}
+                                                        title={quote.is_fixed === 1 ? "取消固定" : "设为固定"}
                                                     >
-                                                        <i className="fa fa-trash"></i>
+                                                        <i className="fa fa-thumb-tack"></i>
                                                     </button>
                                                 </div>
                                             </div>
@@ -301,15 +306,7 @@ function QuoteDisplay({ visible }) {
                                     rows="2"
                                 />
                                 <div className="flex items-center justify-between">
-                                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={newIsFixed === 1}
-                                            onChange={(e) => setNewIsFixed(e.target.checked ? 1 : 0)}
-                                            className="rounded text-primary focus:ring-primary"
-                                        />
-                                        设为固定展示
-                                    </label>
+
                                     <button
                                         onClick={handleAdd}
                                         disabled={!newContent.trim()}

@@ -16,6 +16,10 @@ function ChatView() {
   const toggleKnowledgeSidebar = useStore(state => state.toggleKnowledgeSidebar)
   const toggleInstructionSidebar = useStore(state => state.toggleInstructionSidebar)
 
+  const currentConversationId = useStore(state => state.currentConversationId)
+  const setCurrentConversationId = useStore(state => state.setCurrentConversationId)
+  const addConversation = useStore(state => state.addConversation)
+
   const [inputValue, setInputValue] = useState('')
   const [greetingVisible, setGreetingVisible] = useState(true)
   const [uploadedImages, setUploadedImages] = useState([])
@@ -188,12 +192,25 @@ function ChatView() {
             console.log('Tool call:', chunk.data)
           }
         },
-        abortControllerRef.current.signal
+        abortControllerRef.current.signal,
+        currentConversationId, // 传入当前会话ID
+        true // 启用历史记录
       )
 
       // 更新历史
       if (response.history) {
         setChatHistory(response.history)
+      }
+
+      // 如果是新会话，更新会话ID并添加到列表
+      if (response.conversation_id && response.conversation_id !== currentConversationId) {
+        setCurrentConversationId(response.conversation_id)
+        // 添加到会话列表（简单起见，这里只添加基本信息，标题暂时用第一条消息）
+        addConversation({
+          conversation_id: response.conversation_id,
+          title: text.substring(0, 30) + (text.length > 30 ? '...' : ''),
+          updated_at: new Date().toISOString()
+        })
       }
     } catch (error) {
       if (error.name === 'AbortError') {

@@ -28,9 +28,15 @@ const useStore = create((set, get) => ({
   // 侧边栏状态
   isKnowledgeSidebarOpen: false,
   isInstructionSidebarOpen: false,
+  isConversationSidebarOpen: false,
   isPdfViewerOpen: false,
   currentPdf: null, // { filename, owner, pageNumber }
   pdfOpenedFromKnowledge: false, // 标记PDF是否从知识文档列表打开
+
+  // 会话相关状态
+  conversations: [],
+  currentConversationId: null,
+  isConversationsLoading: false,
 
   // Actions - 聊天
   addMessage: (message) => set((state) => ({
@@ -129,6 +135,37 @@ const useStore = create((set, get) => ({
   })),
 
   setInstructionSidebarOpen: (open) => set({ isInstructionSidebarOpen: open }),
+
+  toggleConversationSidebar: () => set((state) => ({
+    isConversationSidebarOpen: !state.isConversationSidebarOpen,
+    isKnowledgeSidebarOpen: false, // 互斥
+    isInstructionSidebarOpen: false // 互斥
+  })),
+
+  setConversationSidebarOpen: (open) => set({ isConversationSidebarOpen: open }),
+
+  // Actions - 会话
+  setConversations: (conversations) => set({ conversations }),
+
+  setCurrentConversationId: (id) => set({ currentConversationId: id }),
+
+  setIsConversationsLoading: (loading) => set({ isConversationsLoading: loading }),
+
+  addConversation: (conversation) => set((state) => ({
+    conversations: [conversation, ...state.conversations]
+  })),
+
+  updateConversationInList: (id, data) => set((state) => ({
+    conversations: state.conversations.map(conv =>
+      conv.conversation_id === id ? { ...conv, ...data } : conv
+    )
+  })),
+
+  removeConversation: (id) => set((state) => ({
+    conversations: state.conversations.filter(conv => conv.conversation_id !== id),
+    // 如果删除的是当前会话，清空当前会话ID
+    currentConversationId: state.currentConversationId === id ? null : state.currentConversationId
+  })),
 
   // Actions - PDF浏览器
   openPdfViewer: (pdfInfo, fromKnowledge = false) => set({

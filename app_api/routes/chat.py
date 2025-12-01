@@ -13,7 +13,9 @@ def chat():
     Request body:
     {
         "message": "user question",
-        "history": [...]  // optional, conversation history
+        "history": [...],  // optional, conversation history
+        "conversation_id": "uuid",  // optional, for history persistence
+        "enable_history": true  // optional, whether to enable history persistence
     }
 
     Note: User identification is handled server-side via get_current_user()
@@ -22,7 +24,7 @@ def chat():
     Event types:
     - content: Streaming response content
     - tool_call: Tool execution notification
-    - done: Final result with history
+    - done: Final result with history and conversation_id
     """
     try:
         data = request.get_json()
@@ -36,11 +38,20 @@ def chat():
 
         user_message = data['message']
         history = data.get('history', None)
+        conversation_id = data.get('conversation_id')
+        enable_history = data.get('enable_history', False)
+        
         owner = get_current_user() # Always use trusted user from server
         print(f"[DEBUG] Using owner: {owner}", flush=True)
+        print(f"[DEBUG] Conversation ID: {conversation_id}", flush=True)
+        print(f"[DEBUG] Enable history: {enable_history}", flush=True)
 
         # Get or create KMAgent instance for the specific owner
-        km_agent_instance = get_or_create_km_agent(owner)
+        km_agent_instance = get_or_create_km_agent(
+            owner=owner,
+            conversation_id=conversation_id,
+            enable_history=enable_history
+        )
         
         # Reload instructions to ensure we have the latest ones
         km_agent_instance.reload_instructions()

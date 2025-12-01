@@ -6,15 +6,22 @@ const API_BASE_URL = '/api'
  * @param {Array} history - 聊天历史
  * @param {Function} onChunk - 流式数据回调
  * @param {AbortSignal} signal - 可选的 AbortSignal 用于取消请求
+ * @param {string} conversationId - 可选的会话ID
+ * @param {boolean} enableHistory - 是否启用历史记录
  * @returns {Promise<Object>} 最终结果
  */
-export async function sendChatMessage(message, history = [], onChunk, signal = null) {
+export async function sendChatMessage(message, history = [], onChunk, signal = null, conversationId = null, enableHistory = true) {
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({
+      message,
+      history,
+      conversation_id: conversationId,
+      enable_history: enableHistory
+    }),
     signal: signal
   })
 
@@ -30,6 +37,7 @@ export async function sendChatMessage(message, history = [], onChunk, signal = n
   let fullContent = ''
   let toolCalls = []
   let finalHistory = null
+  let finalConversationId = null
   let buffer = '' // 缓冲区，用于处理跨chunk的不完整行
 
   while (true) {
@@ -64,6 +72,7 @@ export async function sendChatMessage(message, history = [], onChunk, signal = n
             // 完成
             finalHistory = data.data.history
             toolCalls = data.data.tool_calls
+            finalConversationId = data.data.conversation_id
           } else if (data.type === 'error') {
             throw new Error(data.data.error)
           }
@@ -81,6 +90,7 @@ export async function sendChatMessage(message, history = [], onChunk, signal = n
       if (data.type === 'done') {
         finalHistory = data.data.history
         toolCalls = data.data.tool_calls
+        finalConversationId = data.data.conversation_id
       }
     } catch (e) {
       console.error('Failed to parse final SSE data:', e)
@@ -90,7 +100,8 @@ export async function sendChatMessage(message, history = [], onChunk, signal = n
   return {
     response: fullContent,
     tool_calls: toolCalls,
-    history: finalHistory
+    history: finalHistory,
+    conversation_id: finalConversationId
   }
 }
 
@@ -446,6 +457,108 @@ export async function deleteQuote(id) {
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error || 'Failed to delete quote')
+  }
+
+  return response.json()
+}
+
+// ==================== 会话管理 API ====================
+
+/**
+ * 获取会话列表
+ * @param {number} limit - 限制数量
+ * @param {number} offset - 偏移量
+ * @returns {Promise<Object>} 会话列表
+ */
+export async function getConversations(limit = 20, offset = 0) {
+  const url = `${API_BASE_URL}/conversations?limit=${limit}&offset=${offset}`
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to fetch conversations')
+  }
+
+  return response.json()
+}
+
+/**
+ * 创建新会话
+ * @param {string} title - 会话标题(可选)
+ * @returns {Promise<Object>} 创建结果
+ */
+export async function createConversation(title = null) {
+  const body = title ? { title } : {}
+  const response = await fetch(`${API_BASE_URL}/conversations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body)
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to create conversation')
+  }
+
+  return response.json()
+}
+
+/**
+ * 获取会话消息历史
+ * @param {string} conversationId - 会话ID
+ * @param {number} limit - 限制数量
+ * @returns {Promise<Object>} 消息历史
+ */
+export async function getConversationMessages(conversationId, limit = 100) {
+  const url = `${API_BASE_URL}/conversations/${conversationId}/messages?limit=${limit}`
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to fetch conversation messages')
+  }
+
+  return response.json()
+}
+
+/**
+ * 更新会话标题
+ * @param {string} conversationId - 会话ID
+ * @param {string} title - 新标题
+ * @returns {Promise<Object>} 更新结果
+ */
+export async function updateConversationTitle(conversationId, title) {
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title })
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to update conversation title')
+  }
+
+  return response.json()
+}
+
+/**
+ * 删除会话
+ * @param {string} conversationId - 会话ID
+ * @returns {Promise<Object>} 删除结果
+ */
+export async function deleteConversation(conversationId) {
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+    method: 'DELETE'
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to delete conversation')
   }
 
   return response.json()
