@@ -72,12 +72,12 @@ def get_documents():
 
 
 @documents_bp.route('/api/upload', methods=['POST'])
-def upload_pdf():
+def upload_document():
     """
-    Upload PDF and vectorize with SSE progress updates
+    Upload document (PDF, Excel) and vectorize with SSE progress updates
 
     Form data:
-    - file: PDF file
+    - file: Document file (PDF, XLSX, XLS)
     - is_public: 0 or 1 (default: 0)
 
     Note: User identification is handled server-side via get_current_user()
@@ -108,7 +108,7 @@ def upload_pdf():
     if not allowed_file(file.filename):
         return jsonify({
             "success": False,
-            "error": "Invalid file type. Only PDF files are allowed"
+            "error": "Invalid file type. Allowed types: PDF, XLSX, XLS"
         }), 400
 
     # Get parameters
@@ -116,10 +116,19 @@ def upload_pdf():
     is_public = int(request.form.get('is_public', 0))
     filename = file.filename
 
+    # Determine content type based on file extension
+    file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+    content_type_map = {
+        'pdf': 'application/pdf',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'xls': 'application/vnd.ms-excel'
+    }
+    content_type = content_type_map.get(file_ext, 'application/octet-stream')
+
     def generate_progress():
         """Generate SSE progress updates"""
         # Import VectorizationProgress for per-request progress tracking
-        from pdf_vectorizer.vectorizer import VectorizationProgress
+        from document_vectorizer import VectorizationProgress
         
         tmp_filepath = None
         # Create a dedicated progress instance for this upload request
@@ -133,7 +142,7 @@ def upload_pdf():
                 filename=filename,
                 file_data=file,
                 bucket='kms',
-                content_type='application/pdf',
+                content_type=content_type,
                 is_public=is_public
             )
 
@@ -147,8 +156,9 @@ def upload_pdf():
             if not content:
                 raise Exception("Failed to retrieve uploaded file from MinIO")
 
-            # Create temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            # Create temporary file with appropriate extension
+            file_suffix = f'.{file_ext}'
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_suffix) as tmp_file:
                 tmp_file.write(content)
                 tmp_filepath = tmp_file.name
 
@@ -157,12 +167,14 @@ def upload_pdf():
                 vectorizer = get_vectorizer()
                 try:
                     logging.info(f"Starting vectorization for {filename}")
-                    vectorizer.vectorize_pdf(
+                    # Use vectorize_file for unified document processing
+                    vectorizer.vectorize_file(
                         tmp_filepath,
                         owner=owner,
                         display_filename=filename,
                         verbose=False,
-                        progress_instance=upload_progress  # Pass dedicated progress instance
+                        progress_instance=upload_progress,  # Pass dedicated progress instance
+                        enable_summary=False  # Default: no LLM summary
                     )
                     logging.info(f"Vectorization completed for {filename}")
                 except Exception as e:

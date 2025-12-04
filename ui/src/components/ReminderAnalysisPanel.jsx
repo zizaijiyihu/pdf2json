@@ -1,35 +1,21 @@
-import React, { useEffect, useState } from 'react'
-import { getReminders } from '../services/api'
+import React from 'react'
+import useStore from '../store/useStore'
 import ReminderAnalysisCard from './ReminderAnalysisCard'
 
 function ReminderAnalysisPanel() {
-    const [reminders, setReminders] = useState([])
-    const [closedReminders, setClosedReminders] = useState(new Set())
-    const [isLoading, setIsLoading] = useState(true)
+    // 从 store 获取数据
+    const reminders = useStore(state => state.reminders)
+    const isLoading = useStore(state => state.isRemindersLoading)
+    const closedReminders = useStore(state => state.closedReminders)
+    const closeReminder = useStore(state => state.closeReminder)
 
-    // 页面加载时获取所有提醒
-    useEffect(() => {
-        loadReminders()
-    }, [])
-
-    const loadReminders = async () => {
-        setIsLoading(true)
-        try {
-            const response = await getReminders()
-            setReminders(response.data || [])
-        } catch (error) {
-            console.error('Failed to load reminders:', error)
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    const handleCloseReminder = (reminderId) => {
-        setClosedReminders(prev => new Set([...prev, reminderId]))
-    }
-
-    // 过滤掉已关闭的提醒
-    const visibleReminders = reminders.filter(r => !closedReminders.has(r.id))
+    // 过滤掉已关闭的提醒(检查过期时间)
+    const now = Date.now()
+    const visibleReminders = reminders.filter(r => {
+        const closedRecord = closedReminders[r.id]
+        // 如果没有关闭记录,或者已过期,则显示
+        return !closedRecord || closedRecord.expiresAt <= now
+    })
 
     // 如果没有可见的提醒，不渲染面板
     if (!isLoading && visibleReminders.length === 0) {
@@ -38,10 +24,10 @@ function ReminderAnalysisPanel() {
 
     return (
         <div
-            className="fixed left-0 top-1/2 transform -translate-y-1/2 w-80 max-h-[80vh] overflow-y-auto scrollbar-thin bg-white/30 backdrop-blur-sm p-4 space-y-3 z-20"
+            className="fixed right-0 top-1/2 transform -translate-y-1/2 w-80 max-h-[80vh] overflow-y-auto scrollbar-thin bg-white/30 backdrop-blur-sm p-4 space-y-3 z-20"
             style={{
-                borderTopRightRadius: '16px',
-                borderBottomRightRadius: '16px'
+                borderTopLeftRadius: '16px',
+                borderBottomLeftRadius: '16px'
             }}
         >
             {/* 标题 */}
@@ -66,7 +52,7 @@ function ReminderAnalysisPanel() {
                     <ReminderAnalysisCard
                         key={reminder.id}
                         reminder={reminder}
-                        onClose={handleCloseReminder}
+                        onClose={closeReminder}
                     />
                 ))
             )}

@@ -6,7 +6,7 @@ Configuration for App API
 
 
 # Upload Configuration
-ALLOWED_EXTENSIONS = {'pdf'}
+ALLOWED_EXTENSIONS = {'pdf', 'xlsx', 'xls'}
 MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
 
 # Flask Configuration

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { getQuotes, createQuote, updateQuote, deleteQuote } from '../services/api'
+import useStore from '../store/useStore'
 
 function QuoteDisplay({ visible }) {
     const [currentQuote, setCurrentQuote] = useState(null)
@@ -12,6 +13,11 @@ function QuoteDisplay({ visible }) {
     const [page, setPage] = useState(1)
     const [hasMore, setHasMore] = useState(true)
     const PAGE_SIZE = 10
+
+    // 从 store 获取轮播状态
+    const currentCarouselQuestion = useStore(state => state.currentCarouselQuestion)
+    const initCarousel = useStore(state => state.initCarousel)
+    const nextCarouselQuestion = useStore(state => state.nextCarouselQuestion)
 
     // Form state
     const [editingId, setEditingId] = useState(null)
@@ -51,6 +57,8 @@ function QuoteDisplay({ visible }) {
 
     useEffect(() => {
         fetchDisplayQuote()
+        // 初始化轮播
+        initCarousel()
     }, [])
 
     // Auto carousel effect (only if there are multiple quotes and no fixed quote)
@@ -66,6 +74,8 @@ function QuoteDisplay({ visible }) {
                     setCurrentQuote(displayQuotes[nextIndex])
                     return nextIndex
                 })
+                // 同时触发问题轮播
+                nextCarouselQuestion()
 
                 setTimeout(() => {
                     setIsTransitioning(false)
@@ -74,7 +84,7 @@ function QuoteDisplay({ visible }) {
         }, 10000) // Change every 10 seconds
 
         return () => clearInterval(interval)
-    }, [displayQuotes])
+    }, [displayQuotes, nextCarouselQuestion])
 
     // Fetch list for management
     const fetchQuotesList = async (isLoadMore = false) => {

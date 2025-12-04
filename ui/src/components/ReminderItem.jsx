@@ -131,9 +131,43 @@ function ReminderItem({ reminder }) {
                         </ReactMarkdown>
                     </div>
                     <div className="flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-xs text-gray-400">
-                            {new Date(reminder.created_at).toLocaleDateString()}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400">
+                                {new Date(reminder.created_at).toLocaleDateString()}
+                            </span>
+                            {/* Public/Private indicator and toggle */}
+                            <button
+                                onClick={async () => {
+                                    const newIsPublic = !reminder.is_public
+                                    const currentUserId = 'current_user' // TODO: 从实际登录状态获取
+
+                                    try {
+                                        await updateReminder(reminder.id, null, newIsPublic, currentUserId)
+                                        updateReminderInList(reminder.id, {
+                                            is_public: newIsPublic ? 1 : 0,
+                                            user_id: newIsPublic ? null : currentUserId
+                                        })
+                                    } catch (error) {
+                                        console.error('Failed to toggle reminder visibility:', error)
+                                        alert('切换失败: ' + error.message)
+                                    }
+                                }}
+                                className="flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                                title={reminder.is_public ? '公开 - 点击切换为私有' : '私有 - 点击切换为公开'}
+                            >
+                                {reminder.is_public ? (
+                                    <>
+                                        <i className="fa fa-globe text-green-500"></i>
+                                        <span className="text-green-600">公开</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fa fa-lock text-orange-500"></i>
+                                        <span className="text-orange-600">私有</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setIsEditing(true)}

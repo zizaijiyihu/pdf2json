@@ -10,6 +10,19 @@ function DocumentItem({ document }) {
 
   const isPublic = document.is_public === 1
 
+  // 获取文件类型和图标
+  const getFileInfo = (filename) => {
+    const ext = filename.split('.').pop()?.toLowerCase()
+    if (ext === 'pdf') {
+      return { type: 'PDF', icon: 'fa-file-pdf-o', color: 'text-red-600', bgColor: 'bg-red-100' }
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      return { type: 'Excel', icon: 'fa-file-excel-o', color: 'text-green-600', bgColor: 'bg-green-100' }
+    }
+    return { type: 'File', icon: 'fa-file-o', color: 'text-gray-600', bgColor: 'bg-gray-100' }
+  }
+
+  const fileInfo = getFileInfo(document.filename)
+
   const handleDelete = async () => {
     try {
       await deleteDocument(document.filename)
@@ -34,11 +47,18 @@ function DocumentItem({ document }) {
   }
 
   const handleClick = () => {
-    openPdfViewer({
-      filename: document.filename,
-      owner: document.owner,
-      pageNumber: 1
-    }, true) // true 表示从知识文档列表打开
+    // 只有 PDF 文件才打开预览器
+    if (fileInfo.type === 'PDF') {
+      openPdfViewer({
+        filename: document.filename,
+        owner: document.owner,
+        pageNumber: 1
+      }, true) // true 表示从知识文档列表打开
+    } else {
+      // Excel 等其他文件类型暂不支持预览，可以添加提示
+      // 未来可以扩展为下载或其他操作
+      console.log('Excel file clicked:', document.filename)
+    }
   }
 
   return (
@@ -48,13 +68,19 @@ function DocumentItem({ document }) {
         onClick={handleClick}
       >
         <div className="flex items-start space-x-3">
-          <div className={`w-10 h-10 ${isPublic ? 'bg-blue-100' : 'bg-green-100'} rounded-lg flex items-center justify-center ${isPublic ? 'text-blue-600' : 'text-green-600'}`}>
-            <i className={`fa ${isPublic ? 'fa-globe' : 'fa-lock'}`} aria-hidden="true"></i>
+          <div className={`w-10 h-10 ${fileInfo.bgColor} rounded-lg flex items-center justify-center ${fileInfo.color}`}>
+            <i className={`fa ${fileInfo.icon}`} aria-hidden="true"></i>
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-gray-800">{document.filename}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium text-gray-800">{document.filename}</h3>
+              {isPublic && (
+                <i className="fa fa-globe text-xs text-blue-500" aria-hidden="true" title="公有文档"></i>
+              )}
+            </div>
             <p className="text-sm text-gray-500 mt-1">
-              {isPublic ? '公有文档' : '私有文档'}
+              {fileInfo.type}
+              {isPublic ? ' · 公有' : ' · 私有'}
               {document.page_count && ` · ${document.page_count}页`}
             </p>
           </div>

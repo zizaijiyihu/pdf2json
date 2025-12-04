@@ -615,11 +615,17 @@ export async function createReminder(content) {
 /**
  * 更新提醒
  * @param {number} id - 提醒ID
- * @param {string} content - 提醒内容
+ * @param {string} content - 提醒内容（可选）
+ * @param {boolean} isPublic - 是否公开（可选）
+ * @param {string} userId - 用户ID（可选）
  * @returns {Promise<Object>} 更新结果
  */
-export async function updateReminder(id, content) {
-  const body = { content }
+export async function updateReminder(id, content = null, isPublic = null, userId = null) {
+  const body = {}
+  if (content !== null) body.content = content
+  if (isPublic !== null) body.is_public = isPublic
+  if (userId !== null) body.user_id = userId
+
   const response = await fetch(`${API_BASE_URL}/reminders/${id}`, {
     method: 'PUT',
     headers: {

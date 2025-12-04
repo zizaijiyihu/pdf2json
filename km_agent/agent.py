@@ -8,9 +8,9 @@ import sys
 import os
 from typing import List, Dict, Optional, Any
 
-# Import PDFVectorizer
+# Import DocumentVectorizer (with PDFVectorizer alias for backward compatibility)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pdf_vectorizer import PDFVectorizer
+from document_vectorizer import PDFVectorizer
 
 # Import ks_infrastructure services
 from ks_infrastructure import ks_openai, ks_user_info
@@ -89,6 +89,7 @@ class KMAgent:
 - get_subordinate_employee_info: 获取下属的员工信息
 - get_current_user_info: 获取当前登录用户的详细信息
 - get_latest_ai_news: 获取最新的AI相关新闻资讯
+- get_course_list: 获取北森系统的课程列表
 """
 
     # 提示词模块库 - 不同模式的特殊指令
@@ -96,14 +97,9 @@ class KMAgent:
         "reminder": """
 【提醒模式特殊要求】
 1. 直接给出最终结论，不要输出推理过程和思考步骤
-2. 回答要极其简洁，控制在100字以内
-3. 如果查询后发现以下任一情况：
-   - 知识库无相关信息
-   - 查询结果为空
-   - 工具返回结果不满足提醒条件（例如："最近没有辛苦的同学"、"没有异常考勤"等）
-   请直接返回: [NO_RESULT]
-4. 只有在有明确、有价值的答案时才输出内容，否则一律返回 [NO_RESULT]
-5. 禁止输出类似"根据查询结果"、"让我分析一下"等推理性语句
+2. 回答要极其简洁，这是用户便签展示
+3. 如果结果中信息，无法解决用户问题，返回 [NO_RESULT]
+4. 禁止输出类似"根据查询结果"、"让我分析一下"等推理性语句
 """,
 
         "summary": """
@@ -127,7 +123,8 @@ class KMAgent:
         verbose: bool = False,
         owner: str = None,
         conversation_id: str = None,
-        enable_history: bool = False
+        enable_history: bool = False,
+        vectorizer: Any = None
     ):
         """
         Initialize KM Agent
@@ -137,7 +134,8 @@ class KMAgent:
             owner: User identifier for loading custom instructions
             conversation_id: Conversation ID for history persistence (optional)
             enable_history: Whether to enable conversation history persistence
-
+            vectorizer: Optional existing DocumentVectorizer instance
+        
         Note:
             All configuration (OpenAI, embedding, Qdrant) is automatically loaded
             from ks_infrastructure services. No need to pass any parameters.
@@ -150,8 +148,11 @@ class KMAgent:
         self.llm_model = OPENAI_CONFIG.get("model", "DeepSeek-V3.1-Ksyun")
 
         # Vectorizer for knowledge base operations (using ks_infrastructure)
-        # collection_name, vector_size are defaults in PDFVectorizer
-        self.vectorizer = PDFVectorizer()
+        # Use provided vectorizer or create new one
+        if vectorizer:
+            self.vectorizer = vectorizer
+        else:
+            self.vectorizer = PDFVectorizer()
 
         # User info service for HR operations
         self.user_info_service = ks_user_info()

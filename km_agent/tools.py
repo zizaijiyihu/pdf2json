@@ -12,6 +12,7 @@ import os
 # Add project root to path to allow imports from other modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from aibase_news.news_service import get_aibase_news
+from beisen_course.course_service import get_course_list
 
 
 class AgentTools:
@@ -190,6 +191,28 @@ class AgentTools:
                     "parameters": {
                         "type": "object",
                         "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_course_list",
+                    "description": "获取北森系统的课程列表，包括课程标题、课程ID、课程描述等信息。适用场景：查询可用的培训课程、浏览课程列表、了解课程信息。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "page_index": {
+                                "type": "integer",
+                                "description": "页码，必须从1开始，默认1",
+                                "default": 1
+                            },
+                            "page_size": {
+                                "type": "integer",
+                                "description": "每页数量，默认10，最大300",
+                                "default": 10
+                            }
+                        }
                     }
                 }
             }
@@ -497,40 +520,75 @@ class AgentTools:
     def _get_latest_ai_news(self, limit: int = 15) -> Dict:
         """
         Get latest AI news
-        
+
         Args:
             limit: Number of news items to return
-            
+
         Returns:
             List of news items
         """
         if self.verbose:
             print(f"\n[Tool] get_latest_ai_news: limit={limit}")
-            
+
         try:
             # Call get_aibase_news. It returns a list. We slice it.
             # We'll use default pages=2 to get enough news, then slice.
             news_list = get_aibase_news(pages=2)
-            
+
             if not news_list:
                 return {
                     "success": True,
                     "data": [],
                     "message": "No news found"
                 }
-                
+
             # Slice to limit
             returned_news = news_list[:limit]
-            
+
             if self.verbose:
                 print(f"[Tool] Retrieved {len(returned_news)} news items")
-                
+
             return {
                 "success": True,
                 "data": returned_news,
                 "total": len(returned_news)
             }
-            
+
+        except Exception as e:
+            if self.verbose:
+                print(f"[Tool] Error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def _get_course_list(self, page_index: int = 1, page_size: int = 10) -> Dict:
+        """
+        Get course list from Beisen system
+
+        Args:
+            page_index: Page number, starting from 1
+            page_size: Page size, default 10, max 300
+
+        Returns:
+            Course list with details
+        """
+        if self.verbose:
+            print(f"\n[Tool] get_course_list: page_index={page_index}, page_size={page_size}")
+
+        try:
+            result = get_course_list(page_index=page_index, page_size=page_size)
+
+            if self.verbose:
+                if result.get('success'):
+                    course_count = len(result.get('data', []))
+                    total = result.get('total', 0)
+                    print(f"[Tool] Retrieved {course_count} courses (total: {total})")
+                else:
+                    print(f"[Tool] Failed: {result.get('error')}")
+
+            return result
+
         except Exception as e:
             if self.verbose:
                 print(f"[Tool] Error: {e}")
@@ -593,6 +651,8 @@ class AgentTools:
                     )
             elif tool_name == "get_latest_ai_news":
                 result = self._get_latest_ai_news(**tool_args)
+            elif tool_name == "get_course_list":
+                result = self._get_course_list(**tool_args)
             else:
                 result = {"success": False, "error": f"Unknown tool: {tool_name}"}
 

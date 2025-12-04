@@ -16,7 +16,10 @@ reminders_bp = Blueprint('reminders', __name__, url_prefix='/api/reminders')
 @reminders_bp.route('', methods=['GET'])
 def get_reminders():
     """
-    获取所有提醒列表
+    获取提醒列表
+    
+    Query Parameters:
+        user_id: 用户ID（可选，如果提供则返回所有公开提醒+该用户的私有提醒）
     
     Returns:
         {
@@ -25,6 +28,8 @@ def get_reminders():
                 {
                     "id": 1,
                     "content": "今天谁比较辛苦",
+                    "is_public": 1,
+                    "user_id": null,
                     "created_at": "2025-12-01 11:00:00",
                     "updated_at": "2025-12-01 11:00:00"
                 }
@@ -32,7 +37,8 @@ def get_reminders():
         }
     """
     try:
-        reminders = reminder_repository.get_all_reminders()
+        user_id = request.args.get('user_id')
+        reminders = reminder_repository.get_all_reminders(user_id=user_id)
         return jsonify({
             'success': True,
             'data': reminders
@@ -52,7 +58,9 @@ def create_reminder():
     
     Request Body:
         {
-            "content": "今天谁比较辛苦"
+            "content": "今天谁比较辛苦",
+            "is_public": true,  // 可选，默认true
+            "user_id": "user123"  // 可选，私有提醒时必填
         }
     
     Returns:
@@ -70,8 +78,13 @@ def create_reminder():
                 'error': '缺少必需参数: content'
             }), 400
         
+        is_public = data.get('is_public', True)
+        user_id = data.get('user_id')
+        
         result = reminder_repository.create_reminder(
-            content=data['content']
+            content=data['content'],
+            is_public=is_public,
+            user_id=user_id
         )
         
         return jsonify(result), 201
@@ -131,7 +144,9 @@ def update_reminder(reminder_id):
     
     Request Body:
         {
-            "content": "最近有什么AI新闻"
+            "content": "最近有什么AI新闻",  // 可选
+            "is_public": false,  // 可选
+            "user_id": "user123"  // 可选，切换为私有时必填
         }
     
     Returns:
@@ -143,15 +158,21 @@ def update_reminder(reminder_id):
     try:
         data = request.get_json()
         
-        if not data or 'content' not in data:
+        if not data:
             return jsonify({
                 'success': False,
-                'error': '缺少必需参数: content'
+                'error': '请求体不能为空'
             }), 400
+        
+        content = data.get('content')
+        is_public = data.get('is_public')
+        user_id = data.get('user_id')
         
         result = reminder_repository.update_reminder(
             reminder_id=reminder_id,
-            content=data['content']
+            content=content,
+            is_public=is_public,
+            user_id=user_id
         )
         
         return jsonify(result)

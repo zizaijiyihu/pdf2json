@@ -1,10 +1,10 @@
 from km_agent import KMAgent
-from pdf_vectorizer import PDFVectorizer
+from document_vectorizer import PDFVectorizer
 
 # Global instances
 km_agent = None
 vectorizer = None
-km_agent_cache = {}  # Cache KMAgent instances per owner
+
 
 def get_or_create_km_agent(owner: str, conversation_id: str = None, enable_history: bool = False):
     """
@@ -19,22 +19,21 @@ def get_or_create_km_agent(owner: str, conversation_id: str = None, enable_histo
         When enable_history is True, a new KMAgent instance is created each time
         to ensure conversation isolation. Otherwise, instances are cached.
     """
-    global km_agent_cache
+    global vectorizer
     
-    # If history is enabled, create a new instance with conversation context
-    if enable_history:
-        return KMAgent(
-            verbose=True,
-            owner=owner,
-            conversation_id=conversation_id,
-            enable_history=True
-        )
+    # Ensure vectorizer is initialized
+    if vectorizer is None:
+        vectorizer = PDFVectorizer()
     
-    # Otherwise, use cached instance
-    if owner not in km_agent_cache:
-        km_agent_cache[owner] = KMAgent(verbose=True, owner=owner)
-    
-    return km_agent_cache[owner]
+    # Always create a new KMAgent instance to ensure thread safety and isolation
+    # We pass the shared vectorizer to avoid re-initialization overhead
+    return KMAgent(
+        verbose=True,
+        owner=owner,
+        conversation_id=conversation_id,
+        enable_history=enable_history,
+        vectorizer=vectorizer
+    )
 
 def init_services():
     """Initialize KM Agent and PDF Vectorizer"""

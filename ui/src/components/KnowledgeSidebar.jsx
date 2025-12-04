@@ -126,12 +126,12 @@ function KnowledgeSidebar() {
           >
             <i className="fa fa-cloud-upload text-3xl text-gray-400 mb-2" aria-hidden="true"></i>
             <p className="text-gray-600 text-sm mb-1">点击或拖拽文件上传</p>
-            <p className="text-xs text-gray-500">目前仅支持 PDF 格式</p>
+            <p className="text-xs text-gray-500">支持 PDF、Excel 格式</p>
             <input
               ref={fileInputRef}
               type="file"
               className="hidden"
-              accept=".pdf"
+              accept=".pdf,.xlsx,.xls"
               onChange={handleFileSelect}
             />
           </div>
